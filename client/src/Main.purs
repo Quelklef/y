@@ -8,6 +8,7 @@ import Effect.Console as Console
 import Data.List (List)
 import Data.List as List
 import Data.Maybe (Maybe(..))
+import Data.Tuple.Nested ((/\))
 import Control.Monad.Trans.Class (lift)
 
 import Platform (Program)
@@ -58,12 +59,15 @@ main = do
 foreign import getHostname :: Effect String
 
 initialize :: Effect { uid :: Id "User", cid :: Id "Convo" }
-initialize = initialize_f (\n -> newId { namespace: n }) (\uid cid -> { uid, cid })
+initialize = do
+  freshUid <- newId
+  freshCid <- newId
+  (uid /\ cid) <- initialize_f (/\) freshUid freshCid
+  pure { uid, cid }
 
-foreign import initialize_f
-  :: forall a b ab.
-     (forall for. String -> Effect (Id for)) -> (Id a -> Id b -> ab)
-  -> Effect ab
+foreign import initialize_f :: forall a b ab.
+  (Id a -> Id b -> ab) ->
+  Id a -> Id b -> Effect ab
 
 mkApp :: Id "User" -> Id "Convo" -> Sub Msg -> Program Unit Model Msg
 mkApp uid cid sub = Platform.app

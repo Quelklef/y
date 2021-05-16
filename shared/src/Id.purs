@@ -6,6 +6,9 @@ import Effect (Effect)
 
 import Data.Newtype (class Newtype, unwrap)
 import Data.Maybe (Maybe(..), isJust)
+import Data.Symbol (class IsSymbol, reflectSymbol, SProxy(..))
+import Data.String.Common (toLower)
+
 import Data.Argonaut.Encode (class EncodeJson, encodeJson) as Agt
 import Data.Argonaut.Decode (class DecodeJson, decodeJson) as Agt
 
@@ -21,29 +24,22 @@ instance decodeJsonId :: Agt.DecodeJson (Id for) where decodeJson = Agt.decodeJs
 instance showId :: Show (Id for) where
   show = unwrap >>> show
 
--- TODO: not sure if this possible but it would be cool to have (newId { namespace } :: Id namespace)
---       perhaps possible by requiring that namespace is a Symbol instead of a String
-newId :: forall for. { namespace :: String } -> Effect (Id for)
-newId { namespace } = newId_f namespace
+_tagName :: forall for. IsSymbol for => SProxy for -> String
+_tagName proxy = reflectSymbol proxy # toLower
+
+newId :: forall for. IsSymbol for => Effect (Id for)
+newId = newId_f (_tagName (SProxy :: SProxy for))
 
 foreign import newId_f :: forall for. String -> Effect (Id for)
 
 -- | Parse an identifier
--- | If @namespace@ is non-@Nothing@, also validates the namespace.
-parseId :: forall for. { namespace :: Maybe String } -> String -> Maybe (Id for)
-parseId { namespace } id = parseId_f Nothing Just caseMaybeOf namespace id
-  where
-    caseMaybeOf :: forall a r. Maybe a -> r -> (a -> r) -> r
-    caseMaybeOf maybe onNothing onJust = case maybe of
-      Nothing -> onNothing
-      Just x -> onJust x
+parseId :: forall for. IsSymbol for => String -> Maybe (Id for)
+parseId id = parseId_f Nothing Just (_tagName (SProxy :: SProxy for)) id
 
-foreign import parseId_f
-  :: forall for.
-     (forall a. Maybe a) -> (forall a. a -> Maybe a)  -- constructors for Maybe
-  -> (forall a r. Maybe a -> r -> (a -> r) -> r)      -- destructor for Maybe
-  -> Maybe String -> String -> Maybe (Id for)
+foreign import parseId_f :: forall for.
+  (forall a. Maybe a) -> (forall a. a -> Maybe a) ->
+  String -> String -> Maybe (Id for)
 
--- | @isId n s@ is the same as @isJust (parseId n s)@
-isId :: { namespace :: Maybe String } -> String -> Boolean
-isId = (map >>> map) isJust parseId
+-- | @isId s@ is the same as @isJust (parseId s)@
+isId :: forall for. IsSymbol for => String -> Boolean
+isId = map isJust (parseId :: String -> Maybe (Id for))

@@ -70,7 +70,7 @@ main = do
 
   server # Ws.onConnection \client -> do
 
-    clid <- newId { namespace: "client" }
+    clid <- newId
     clientsRef # Ref.modify_ (Map.insert clid client)
 
     Console.log $ "New WebSocket connection: " <> unwrap clid

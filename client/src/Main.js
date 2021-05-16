@@ -5,15 +5,15 @@ exports.getHostname =
 };
 
 exports.initialize_f =
-newId => mk2tuple =>
-() =>
+mk2tuple =>
+freshUid => freshCid => () =>
 {
   let uid = localStorage.getItem('uid');
-  if (!uid) uid = newId('user');
+  if (!uid) uid = freshUid
   localStorage.setItem('uid', uid);
 
   const cid = new URL(window.location.href).searchParams.get('cid');
-  if (!cid) window.location.href += '?cid=' + newId('convo');
+  if (!cid) window.location.href += '?cid=' + freshCid;
 
   return mk2tuple(uid)(cid);
 };

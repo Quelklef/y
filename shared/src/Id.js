@@ -6,8 +6,9 @@ exports.newId_f = namespace => () => {
   return `y-${namespace}-${time}-${rand}`;
 }
 
-exports.parseId_f = just => nothing => caseMaybeOf => maybeNamespace => string => {
+exports.parseId_f = just => nothing => namespace => string => {
   const formatOk = !!/^y-[a-zA-Z]+-[0-9]+-[0-9]{6}$/.test(string);
-  const namespaceOk = caseMaybeOf(maybeNamespace)(true)(namespace => string.split('-') === namespace);
+  const namespaceOk = string.split('-') === namespace;
   return formatOk && namespaceOk ? just(string) : nothing;
 };
+

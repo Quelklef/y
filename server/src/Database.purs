@@ -10,6 +10,7 @@ import Data.String.CodeUnits (slice)
 import Data.Traversable (for, sequence)
 import Data.Newtype (unwrap)
 import Data.Array (catMaybes, toUnfoldable)
+import Data.Symbol (class IsSymbol)
 import Node.FS.Sync (readdir, readFile, writeFile)
 import Node.Buffer (Buffer)
 
@@ -21,7 +22,7 @@ import Shared.Codable (class Encodable, class Decodable, encode, decode)
 -- Since the app architecture is append-only, we can kinda get away with it (for now).
 
 -- | Load all events in a conversation
-load :: forall m event (cid :: Symbol). Applicative m => Decodable m event => Id cid -> Effect (m (List event))
+load :: forall m event (cid :: Symbol) (eid :: Symbol). IsSymbol eid => Applicative m => Decodable m event => Id cid -> Effect (m (List event))
 load cid = do
   let dirLoc = "./db/" <> unwrap cid
   fileNames <- readdir dirLoc
@@ -29,7 +30,7 @@ load cid = do
         fileNames
         # map (\fileName ->
             if fileName # endsWith ".txt"
-            then parseId { namespace: Nothing } =<< (fileName # slice 0 (-4))
+            then (parseId :: String -> Maybe (Id eid)) =<< (fileName # slice 0 (-4))
             else Nothing)
         # catMaybes
   mEvents :: Array (m event) <- for eids \eid -> do
