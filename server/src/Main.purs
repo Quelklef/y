@@ -2,6 +2,8 @@ module Main where
 
 import Prelude
 
+import Debug as Debug
+
 import Effect (Effect)
 import Effect.Ref (Ref)
 import Effect.Ref as Ref
@@ -22,9 +24,9 @@ import Shared.Convo (Convo, Event)
 import Shared.Transmission (Transmission(..))
 import Shared.Config as Config
 
+import Server.Util.Relation (Relation)
+import Server.Util.Relation as Relation
 import Server.WebSocket as Ws
-import Server.Relation (Relation)
-import Server.Relation as Relation
 
 type Client = Ws.Client Transmission (List Event)
 
@@ -38,65 +40,65 @@ type Clients = Map (Id "Client") Client
 -- TODO: this setup is... ugly.
 
 _convos_ensureExists :: Id "Convo" -> Ref Convos -> Effect Unit
-_convos_ensureExists cid convosRef = do
-  existing <- Ref.read convosRef <#> Map.lookup cid
+_convos_ensureExists convoId convosRef = do
+  existing <- Ref.read convosRef <#> Map.lookup convoId
   case existing of
     Just _ -> pure unit
     Nothing -> do
-      let convo = { id: cid, events: mempty }
+      let convo = { id: convoId, events: mempty }
       convosRef # Ref.modify_ (Map.insert convo.id convo)
       pure unit
 
 convos_get :: Id "Convo" -> Ref Convos -> Effect Convo
-convos_get cid convosRef = do
-  _convos_ensureExists cid convosRef
-  unsafePartial $ Ref.read convosRef <#> Map.lookup cid >>> fromJust
+convos_get convoId convosRef = do
+  _convos_ensureExists convoId convosRef
+  unsafePartial $ Ref.read convosRef <#> Map.lookup convoId >>> fromJust
 
 convos_modify :: Id "Convo" -> (Convo -> Convo) -> Ref Convos -> Effect Unit
-convos_modify cid f convosRef = do
-  _convos_ensureExists cid convosRef
+convos_modify convoId f convosRef = do
+  _convos_ensureExists convoId convosRef
   convosRef # Ref.modify_ \convos ->
-    let convo = unsafePartial $ Map.lookup cid convos # fromJust
-    in Map.insert cid (f convo) convos
+    let convo = unsafePartial $ Map.lookup convoId convos # fromJust
+    in Map.insert convoId (f convo) convos
 
 main :: Effect Unit
 main = do
 
   subsRef <- Ref.new (Relation.empty :: Subs)
-  convosRef <- Ref.new (mempty :: Convos)
-  clientsRef <- Ref.new (mempty :: Clients)
+  convosRef <- Ref.new (Map.empty :: Convos)
+  clientsRef <- Ref.new (Map.empty :: Clients)
 
   server <- Ws.newServer { port: Config.webSocketPort }
 
   server # Ws.onConnection \client -> do
 
-    clid <- newId
-    clientsRef # Ref.modify_ (Map.insert clid client)
+    clientId <- newId
+    clientsRef # Ref.modify_ (Map.insert clientId client)
 
-    Console.log $ "New WebSocket connection: " <> unwrap clid
+    Console.log $ "New WebSocket connection: " <> unwrap clientId
 
     client # Ws.onTransmission case _ of
       Left err -> Console.warn $ "Warning: transmission failed to decode; details:\n" <> err
       Right tn -> do
         case tn of
-          Transmission_Subscribe { cid } -> do
-            subsRef # Ref.modify_ (Relation.incl clid cid)
+          Transmission_Subscribe { convoId } -> do
+            subsRef # Ref.modify_ (Relation.incl clientId convoId)
 
-          Transmission_Pull { cid } -> do
-            convo <- convos_get cid convosRef
-            let events = convo.events
+          Transmission_Pull { convoId } -> do
+            convo <- convos_get convoId convosRef
+            let events = (Debug.log convo).events
             client # Ws.transmit events
 
-          Transmission_Push { cid, event } -> do
+          Transmission_Push { convoId, event } -> do
             -- v Push event
-            convosRef # convos_modify cid \convo -> convo { events = convo.events <> List.singleton event }
+            convosRef # convos_modify convoId \convo -> convo { events = convo.events <> List.singleton event }
             -- v Notify subscribed clients
-            subbedClids :: Array (Id "Client") <- Ref.read subsRef <#> Relation.rget cid >>> Set.toUnfoldable
-            for_ subbedClids \subbedClid -> do
+            subbedClientIds :: Array (Id "Client") <- Ref.read subsRef <#> Relation.rget convoId >>> Set.toUnfoldable
+            for_ subbedClientIds \subbedClientId -> do
               clients <- Ref.read clientsRef
-              let (subbed :: Client) = unsafePartial $ fromJust $ Map.lookup subbedClid clients
+              let (subbed :: Client) = unsafePartial $ fromJust $ Map.lookup subbedClientId clients
               subbed # Ws.transmit (List.singleton event)
 
     client # Ws.onClose do
-      subsRef # Ref.modify_ (Relation.lexp clid)
-      Console.log $ "End WebSocket connection: " <> unwrap clid
+      subsRef # Ref.modify_ (Relation.lexp clientId)
+      Console.log $ "End WebSocket connection: " <> unwrap clientId

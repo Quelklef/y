@@ -4,8 +4,8 @@ import Data.Generic.Rep (class Generic)
 
 import Data.Argonaut.Encode (class EncodeJson) as Agt
 import Data.Argonaut.Decode (class DecodeJson) as Agt
-import Data.Argonaut.Encode.Generic.Rep (genericEncodeJson) as Agt
-import Data.Argonaut.Decode.Generic.Rep (genericDecodeJson) as Agt
+import Data.Argonaut.Encode.Generic (genericEncodeJson) as Agt
+import Data.Argonaut.Decode.Generic (genericDecodeJson) as Agt
 
 import Shared.Id (Id)
 import Shared.Convo (Event)
@@ -15,15 +15,15 @@ import Shared.Convo (Event)
 data Transmission
 
   = Transmission_Subscribe
-    { cid :: Id "Convo"
+    { convoId :: Id "Convo"
     }
 
   | Transmission_Pull
-    { cid :: Id "Convo"
+    { convoId :: Id "Convo"
     }
 
   | Transmission_Push
-    { cid :: Id "Convo"
+    { convoId :: Id "Convo"
     , event :: Event
     }
 

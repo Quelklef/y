@@ -14,35 +14,35 @@ import Data.Symbol (class IsSymbol)
 import Node.FS.Sync (readdir, readFile, writeFile)
 import Node.Buffer (Buffer)
 
+import Shared.Util.Codable (class Encodable, class Decodable, encode, decode)
 import Shared.Id (Id, parseId)
-import Shared.Codable (class Encodable, class Decodable, encode, decode)
 
 -- Our "database" will be the filesystem
 -- Why? Meh, why not.
 -- Since the app architecture is append-only, we can kinda get away with it (for now).
 
 -- | Load all events in a conversation
-load :: forall m event (cid :: Symbol) (eid :: Symbol). IsSymbol eid => Applicative m => Decodable m event => Id cid -> Effect (m (List event))
-load cid = do
-  let dirLoc = "./db/" <> unwrap cid
+load :: forall m event (convoId :: Symbol) (eventId :: Symbol). IsSymbol eventId => Applicative m => Decodable m event => Id convoId -> Effect (m (List event))
+load convoId = do
+  let dirLoc = "./db/" <> unwrap convoId
   fileNames <- readdir dirLoc
-  let eids =
+  let eventIds =
         fileNames
         # map (\fileName ->
             if fileName # endsWith ".txt"
-            then (parseId :: String -> Maybe (Id eid)) =<< (fileName # slice 0 (-4))
+            then (parseId :: String -> Maybe (Id eventId)) =<< (fileName # slice 0 (-4))
             else Nothing)
         # catMaybes
-  mEvents :: Array (m event) <- for eids \eid -> do
-    let fileLoc = "./db/" <> unwrap cid <> "/" <> unwrap eid <> ".txt"
+  mEvents :: Array (m event) <- for eventIds \eventId -> do
+    let fileLoc = "./db/" <> unwrap convoId <> "/" <> unwrap eventId <> ".txt"
     mEvent <- decode <<< decodeUtf8 <$> readFile fileLoc
     pure mEvent
   pure $ mEvents # toUnfoldable # sequence
 
 -- | Save an event into a conversation
-push :: forall event (cid :: Symbol) (eid :: Symbol). Encodable event => Id cid -> Id eid -> event -> Effect Unit
-push cid eid event = do
-  let fileLoc = "./db/" <> unwrap cid <> "/" <> unwrap eid <> ".txt"
+push :: forall event (convoId :: Symbol) (eventId :: Symbol). Encodable event => Id convoId -> Id eventId -> event -> Effect Unit
+push convoId eventId event = do
+  let fileLoc = "./db/" <> unwrap convoId <> "/" <> unwrap eventId <> ".txt"
   writeFile fileLoc (encodeUtf8 <<< encode $ event)
 
 foreign import encodeUtf8 :: String -> Buffer

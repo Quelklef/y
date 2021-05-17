@@ -7,7 +7,7 @@ import Effect.Uncurried (EffectFn1, mkEffectFn1, runEffectFn1)
 
 import Sub (Sub, ForeignSub, Canceler, newBuilder, newForeign)
 
-import Shared.Codable (class Decodable)
+import Shared.Util.Codable (class Decodable)
 
 import Client.WebSocket (Client, onTransmission)
 

@@ -4,7 +4,7 @@ import Prelude
 
 import Effect (Effect)
 
-import Shared.Codable (class Encodable, class Decodable, encode, decode)
+import Shared.Util.Codable (class Encodable, class Decodable, encode, decode)
 
 -- | @Server ts tc@ is the type of WebSocket servers who receive transmissions
 -- | of type @ts@ ("to server") and send transmissions of type @tc@ ("to client")

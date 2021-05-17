@@ -6,12 +6,11 @@ import Effect (Effect)
 import Effect.Uncurried (runEffectFn1)
 import Effect.Console as Console
 import Data.List (List)
-import Data.List as List
 import Data.Maybe (Maybe(..))
 import Data.Tuple.Nested ((/\))
 import Control.Monad.Trans.Class (lift)
+import Effect.Class (liftEffect)
 
-import Platform (Program)
 import Platform as Platform
 import Sub (Sub)
 
@@ -20,16 +19,25 @@ import Shared.Convo (Event)
 import Shared.Transmission (Transmission(..))
 import Shared.Config as Config
 
-import Client.Core (Model, Msg)
+import Client.Core (mkInitialModel)
+import Client.Action (Action, runActionMonad)
 import Client.View (view)
 import Client.WebSocket as Ws
 import Client.WebSocketClientToElmishSubscription (websocketClientToElmishSubscription)
+
+foreign import initialize_f :: forall a b r.
+  (Id a -> Id b -> r) ->
+  Id a -> Id b -> Effect r
+
+foreign import getHostname :: Effect String
 
 main :: Effect Unit
 main = do
 
   -- Initialize state
-  { uid, cid } <- initialize
+  freshUserId /\ freshConvoId <- (/\) <$> newId <*> newId
+  userId /\ convoId <- initialize_f (/\) freshUserId freshConvoId
+  let initialModel = mkInitialModel userId convoId
 
   -- Spin up websocket
   hostname <- getHostname
@@ -38,51 +46,25 @@ main = do
 
   -- Start Elmish
   let sub = mkSub wsClient
-  let app = mkApp uid cid sub
+  let app = Platform.app
+        { init: pure <<< const initialModel
+        , update: \model action -> lift (runActionMonad { wsClient } (action model))
+        , subscriptions: const sub
+        , view
+        } 
   (runEffectFn1 app) unit
 
   -- Kick the thing off!
   wsClient # Ws.onOpen do
     Console.log "WebSocket opened"
-    wsClient # Ws.transmit (Transmission_Subscribe { cid })
-    wsClient # Ws.transmit (Transmission_Pull { cid })
+    wsClient # Ws.transmit (Transmission_Subscribe { convoId })
+    wsClient # Ws.transmit (Transmission_Pull { convoId })
 
   where
-    mkSub :: forall ts. Ws.Client ts (List Event) -> Sub Msg
-    mkSub = websocketClientToElmishSubscription >>> map maybeEventsToMsg
+    mkSub :: forall ts. Ws.Client ts (List Event) -> Sub Action
+    mkSub = websocketClientToElmishSubscription >>> map maybeEventsToAction
 
-    maybeEventsToMsg :: Maybe (List Event) -> Msg
-    maybeEventsToMsg = case _ of
-      Nothing -> \model -> Console.warn "Events list failed to parse; doing nothing" $> model
+    maybeEventsToAction :: Maybe (List Event) -> Action
+    maybeEventsToAction = case _ of
+      Nothing -> \model -> model <$ liftEffect (Console.warn "Events list failed to parse; doing nothing")
       Just events -> \model -> pure $ model { convo = model.convo { events = model.convo.events <> events } }
-
-foreign import getHostname :: Effect String
-
-initialize :: Effect { uid :: Id "User", cid :: Id "Convo" }
-initialize = do
-  freshUid <- newId
-  freshCid <- newId
-  (uid /\ cid) <- initialize_f (/\) freshUid freshCid
-  pure { uid, cid }
-
-foreign import initialize_f :: forall a b ab.
-  (Id a -> Id b -> ab) ->
-  Id a -> Id b -> Effect ab
-
-mkApp :: Id "User" -> Id "Convo" -> Sub Msg -> Program Unit Model Msg
-mkApp uid cid sub = Platform.app
-    { init: pure <<< const model0
-    , update: \model msg -> lift (msg model)
-    , subscriptions: const sub
-    , view
-    }
-
-  where
-    model0 =
-      { userId: uid
-      , convo:
-        { id: cid
-        , events: List.Nil
-        }
-      }
-
