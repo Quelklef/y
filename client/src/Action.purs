@@ -24,7 +24,7 @@ type ActionAnswer =
   { wsClient :: Ws.Client Transmission (List Event)
   }
 
-runActionMonad :: forall a. ActionAnswer -> ActionMonad a -> Effect a
+runActionMonad :: ActionAnswer -> ActionMonad ~> Effect
 runActionMonad answer (ActionMonad act) = runReaderT act answer
 
 unActionMonad :: forall a. ActionMonad a -> ReaderT ActionAnswer Effect a

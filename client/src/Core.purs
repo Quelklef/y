@@ -1,5 +1,7 @@
 module Client.Core where
 
+import Prelude
+
 import Effect (Effect)
 import Data.Set (Set)
 import Data.Set as Set

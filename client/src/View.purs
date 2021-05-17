@@ -100,15 +100,14 @@ viewBody model =
     , S.width "100vw"
     , S.height "100vh"
     ]
-    [ A.addClass "root"
-    , guard (isNothing model.focused) $ onKey "Enter" defOpts pure Actions.createDraft
+    [ guard (isNothing model.focused) $ onKey "Enter" defOpts pure Actions.createDraft
     , A.tabindex "0"  -- required to pick up key presses
     ]
     (List.toUnfoldable cardHtmls)
 
 viewCard :: Map (Id "User") String -> Vec2 -> Card -> Html Action
 viewCard userNames position card =
-  H.spanS
+  H.divS
   [ S.position "absolute"
   , S.top $ (show (unwrap position).y) <> "px"
   , S.left $ (show (unwrap position).x) <> "px"
@@ -116,16 +115,16 @@ viewCard userNames position card =
   , S.height "auto"
   , S.display "inline-block"
   ]
-  [ A.addClass "card"
-  , A.onClick \model -> pure $ model { focused = Just (cardId card) }
+  [ A.onClick \model -> pure $ model { focused = Just (cardId card) }
   , guard (not $ isDraft card) $ onKey "Enter" defOpts pure Actions.createDraft
   ]
-  [ H.spanS
+  [ H.divS
     [ ]
-    [ A.addClass "card-content" ]
+    [ ]
     [ H.textareaS
       [ ]
-      [ case card of
+      [ A.id $ "textarea-for-" <> unwrap (cardId card)  -- hack for being able to set focus on the textareas
+      , case card of
           Card_Message _ ->
             A.disabled "disabled"
 
@@ -136,9 +135,9 @@ viewCard userNames position card =
       ]
       [ H.text $ cardContent card ]
     ]
-  , H.spanS
+  , H.divS
     [ ]
-    [ A.addClass "card-author" ]
+    [ ]
     [ let authorName = cardAuthorId card >>= flip Map.lookup userNames # fromMaybe "<anonymous>"
       in H.text authorName ]
   ]

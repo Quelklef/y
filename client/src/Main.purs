@@ -3,15 +3,12 @@ module Main where
 import Prelude
 
 import Effect (Effect)
-import Effect.Uncurried (runEffectFn1)
 import Effect.Console as Console
 import Data.List (List)
 import Data.Maybe (Maybe(..))
 import Data.Tuple.Nested ((/\))
-import Control.Monad.Trans.Class (lift)
 import Effect.Class (liftEffect)
 
-import Platform as Platform
 import Sub (Sub)
 
 import Shared.Id (Id, newId)
@@ -19,6 +16,7 @@ import Shared.Convo (Event)
 import Shared.Transmission (Transmission(..))
 import Shared.Config as Config
 
+import Client.App (runApp)
 import Client.Core (mkInitialModel)
 import Client.Action (Action, runActionMonad)
 import Client.View (view)
@@ -46,13 +44,12 @@ main = do
 
   -- Start Elmish
   let sub = mkSub wsClient
-  let app = Platform.app
-        { init: pure <<< const initialModel
-        , update: \model action -> lift (runActionMonad { wsClient } (action model))
-        , subscriptions: const sub
-        , view
-        } 
-  (runEffectFn1 app) unit
+  runApp
+    { initialModel: initialModel
+    , subscriptions: const sub
+    , view: view
+    , interpret: runActionMonad { wsClient }
+    }
 
   -- Kick the thing off!
   wsClient # Ws.onOpen do
