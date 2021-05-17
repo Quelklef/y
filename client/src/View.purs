@@ -2,6 +2,8 @@ module Client.View (view) where
 
 import Prelude
 
+import Debug as Debug
+
 import Data.Map (Map)
 import Data.Map as Map
 import Data.Set (Set)
@@ -83,15 +85,27 @@ viewBody model =
   let
     convoState = simulate model.convo.events
     (cards :: List Card) = Set.toUnfoldable $ (<>) (Set.map Card_Message convoState.messages) (Set.map Card_Draft model.drafts)
-    positions = cards # arrange
-                            cardId
-                            (cardDeps >>> Set.toUnfoldable)
-                            (case _ of
-                                Card_Message m -> m.time
-                                Card_Draft d -> d.timeCreated)
-                            (calcDims <<< viewCard convoState.userNames Vec2.origin)
+
+    viewCard'needsPosition position card =
+      viewCard
+        convoState.userNames
+        (model.focused == Just (cardId card))
+        (model.selected # Set.member (cardId card))
+        position
+        card
+
+    positions =
+      arrange
+        cardId
+        (cardDeps >>> Set.toUnfoldable)
+        (case _ of
+            Card_Message m -> m.time
+            Card_Draft d -> d.timeCreated)
+        (\card -> calcDims $ viewCard'needsPosition Vec2.origin card)
+        cards
+
     cardHtmls = cards # map \card -> let position = unsafePartial $ fromJust (Map.lookup (cardId card) positions)
-                                     in viewCard convoState.userNames position card
+                                     in viewCard'needsPosition position card
   in
     H.divS
     [ S.position "absolute"
@@ -105,8 +119,8 @@ viewBody model =
     ]
     (List.toUnfoldable cardHtmls)
 
-viewCard :: Map (Id "User") String -> Vec2 -> Card -> Html Action
-viewCard userNames position card =
+viewCard :: Map (Id "User") String -> Boolean -> Boolean -> Vec2 -> Card -> Html Action
+viewCard userNames isFocused isSelected position card =
   H.divS
   [ S.position "absolute"
   , S.top $ (show (unwrap position).y) <> "px"
@@ -114,15 +128,34 @@ viewCard userNames position card =
   , S.width "300px"
   , S.height "auto"
   , S.display "inline-block"
+
+  , let borderColor = if isFocused then "red" else if isSelected then "blue" else "lightgrey"
+    in S.border $ "1px solid " <> borderColor
+  , S.padding ".8rem 1.2rem"
+  , S.borderRadius ".3em"
+  , S.boxShadow "0 2px 6px -4px rgb(0 0 0 / 50%)"
+  , S.background "white"
+  , S.fontFamily "sans-serif"
+  , S.fontSize "13px"
   ]
   [ A.onClick \model -> pure $ model { focused = Just (cardId card) }
   , guard (not $ isDraft card) $ onKey "Enter" defOpts pure Actions.createDraft
   ]
   [ H.divS
     [ ]
-    [ ]
+    [ A.tabindex "0"  -- required to pick up key presses
+    ]
     [ H.textareaS
-      [ ]
+      [ S.padding "none"
+      , S.background "none"
+      , S.resize "none"
+      , S.fontFamily "inherit"
+      , S.fontSize "inherit"
+      , S.color "inherit"
+      , S.border $ if isDraft card then "1px solid lightgrey" else "none"
+      , S.outline "none !important"
+      , S.width "100%"
+      ]
       [ A.id $ "textarea-for-" <> unwrap (cardId card)  -- hack for being able to set focus on the textareas
       , case card of
           Card_Message _ ->
@@ -136,10 +169,14 @@ viewCard userNames position card =
       [ H.text $ cardContent card ]
     ]
   , H.divS
-    [ ]
+    [ S.fontSize "0.75em"
+    , S.textAlign "right"
+    , S.fontStyle "italic"
+    , S.opacity "0.5"
+    ]
     [ ]
     [ let authorName = cardAuthorId card >>= flip Map.lookup userNames # fromMaybe "<anonymous>"
-      in H.text authorName ]
+      in H.text $ (unwrap $ cardId card) <> " from " <> authorName ]
   ]
 
 onKey :: forall act. String -> Opts { self :: Boolean, shift :: Boolean } -> act -> act -> A.Attribute act

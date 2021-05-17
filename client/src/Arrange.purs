@@ -2,6 +2,8 @@ module Client.Arrange where
 
 import Prelude
 
+import Debug as Debug
+
 import Data.List (List)
 import Data.List as List
 import Data.Map (Map)
@@ -75,13 +77,14 @@ arrange getId getDeps getTime getDims =
         nodesByTier = invertMap tierByNode
         allTiers = Map.keys nodesByTier # List.fromFoldable
 
-        -- The weight of a node is the maximum number of nodes in any descendant tiers
+        -- The weight of a node is the maximum number of nodes in
+        -- any descendant tier, or 1 if there are no descendant tiers
         weight :: node -> Int
         weight node = allTiers
                     # List.filter (_ > (tierByNode # lookup' node))
                     # map (\tier -> nodesByTier # lookup' tier # length)
                     # maximum
-                    # fromMaybe 0
+                    # fromMaybe 1
 
         go tier soFar =
           case Map.lookup tier nodesByTier of
@@ -120,8 +123,8 @@ arrange getId getDeps getTime getDims =
         xRange = maximum' xs - minimum' xs
         yRange = maximum' ys - minimum' ys
         nodeCount = placements # Map.keys # length
-        targetXRange = Int.toNumber $ nodeCount * 300
-        targetYRange = Int.toNumber $ nodeCount * 100
+        targetXRange = Int.toNumber $ nodeCount * 80
+        targetYRange = Int.toNumber $ nodeCount * 50
         xScale = targetXRange / xRange
         yScale = targetYRange / yRange
       in
