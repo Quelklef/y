@@ -106,6 +106,14 @@ viewBody model =
 
     cardHtmls = cards # map \card -> let position = unsafePartial $ fromJust (Map.lookup (cardId card) positions)
                                      in viewCard'needsPosition position card
+
+    arrows = cards >>= \card -> cardDeps card # Set.toUnfoldable # map \dep ->
+      let from = unsafePartial $ fromJust $ positions # Map.lookup dep
+          to   = unsafePartial $ fromJust $ positions # Map.lookup (cardId card)
+      in { from, to }
+
+    arrowHtmls = arrows # map viewArrow
+
   in
     H.divS
     [ S.position "absolute"
@@ -117,14 +125,25 @@ viewBody model =
     [ guard (isNothing model.focused) $ onKey "Enter" defOpts pure Actions.createDraft
     , A.tabindex "0"  -- required to pick up key presses
     ]
-    (List.toUnfoldable cardHtmls)
+    [ H.divS
+      [ S.position "absolute"
+      , S.top "50vh"
+      , S.left "50vw"
+      , S.width "0"
+      , S.height "0"
+      ]
+      [ ]
+      (List.toUnfoldable $ cardHtmls <> arrowHtmls)
+    ]
 
 viewCard :: Map (Id "User") String -> Boolean -> Boolean -> Vec2 -> Card -> Html Action
 viewCard userNames isFocused isSelected position card =
   H.divS
   [ S.position "absolute"
+  , S.zIndex "1"  -- above the arrows
   , S.top $ (show (unwrap position).y) <> "px"
   , S.left $ (show (unwrap position).x) <> "px"
+  , S.transform "translate(-50%, -50%)"  -- center the card
   , S.width "300px"
   , S.height "auto"
   , S.display "inline-block"
@@ -146,7 +165,7 @@ viewCard userNames isFocused isSelected position card =
     [ A.tabindex "0"  -- required to pick up key presses
     ]
     [ H.textareaS
-      [ S.padding "none"
+      [ S.padding "0"
       , S.background "none"
       , S.resize "none"
       , S.fontFamily "inherit"
@@ -178,6 +197,22 @@ viewCard userNames isFocused isSelected position card =
     [ let authorName = cardAuthorId card >>= flip Map.lookup userNames # fromMaybe "<anonymous>"
       in H.text $ (unwrap $ cardId card) <> " from " <> authorName ]
   ]
+
+viewArrow :: forall msg. { from :: Vec2, to :: Vec2 } -> Html msg
+viewArrow { from, to } =
+  H.spanS
+    [ S.display "inline-block"
+    , S.position "absolute"
+    , S.background "url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAOUlEQVQoU2N89uzZfwY0ICUlxYguxohNIUgRumKwTmIUw60gpBjFLfgUk66QKKsJKQJ5mPjgITbAAdzAKAuIG+NRAAAAAElFTkSuQmCC) repeat"
+    , S.height "10px"
+    , S.width $ show (Vec2.mag $ to - from) <> "px"
+    , S.top $ show (Vec2.getY from) <> "px"
+    , S.left $ show (Vec2.getX from) <> "px"
+    , S.transform $ "rotate(" <> show (Vec2.angle $ to - from) <> "rad)"
+    , S.transformOrigin "center left"
+    ]
+    [ ]
+    [ ]
 
 onKey :: forall act. String -> Opts { self :: Boolean, shift :: Boolean } -> act -> act -> A.Attribute act
 onKey key mkOpts actNoop actDoIt =
