@@ -81,7 +81,7 @@ sendMessage draft model = do
   let authorId = model.userId
   let message =
         { id: draft.id
-        , time: now
+        , timeSent: now
         , authorId
         , convoId
         , deps: draft.deps

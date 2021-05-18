@@ -56,6 +56,7 @@ derive instance ordCard :: Ord Card
 
 -- Hmmm, maybe there's a nicer way to this card* stuff.
 -- ... typeclasses?
+-- (^^ TODO ^^)
 
 cardId :: Card -> Id "Message"
 cardId (Card_Message m) = m.id
@@ -74,7 +75,7 @@ cardAuthorId (Card_Message m) = Just m.authorId
 cardAuthorId (Card_Draft _) = Nothing
 
 cardTime :: Card -> Instant
-cardTime (Card_Message m) = m.time
+cardTime (Card_Message m) = m.timeSent
 cardTime (Card_Draft d) = d.timeCreated
 
 isDraft :: Card -> Boolean
@@ -102,9 +103,7 @@ viewBody model =
       arrange
         cardId
         (cardDeps >>> Set.toUnfoldable)
-        (case _ of
-            Card_Message m -> m.time
-            Card_Draft d -> d.timeCreated)
+        (cardTime)
         (\card -> calcDims $ viewCard'needsPosition Vec2.origin card)
         cards
 

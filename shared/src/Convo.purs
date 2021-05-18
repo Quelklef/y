@@ -58,7 +58,7 @@ type ConvoState =
 
 type Message =
   { id :: Id "Message"
-  , time :: Instant
+  , timeSent :: Instant
   , authorId :: Id "User"
   , convoId :: Id "Convo"
   , deps :: Set (Id "Message")
