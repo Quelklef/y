@@ -1,4 +1,4 @@
-module Client.Util.Memoize where
+module Y.Client.Util.Memoize where
 
 import Prelude
 

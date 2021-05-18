@@ -1,10 +1,10 @@
-module Server.WebSocket where
+module Y.Server.WebSocket where
 
 import Prelude
 
 import Effect (Effect)
 
-import Shared.Util.Codable (class Encodable, class Decodable, encode, decode)
+import Y.Shared.Util.Codable (class Encodable, class Decodable, encode, decode)
 
 -- | @Server ts tc@ is the type of WebSocket servers who receive transmissions
 -- | of type @ts@ ("to server") and send transmissions of type @tc@ ("to client")

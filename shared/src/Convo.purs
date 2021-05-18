@@ -1,4 +1,4 @@
-module Shared.Convo where
+module Y.Shared.Convo where
 
 import Prelude
 
@@ -15,8 +15,8 @@ import Data.Argonaut.Decode (class DecodeJson) as Agt
 import Data.Argonaut.Encode.Generic (genericEncodeJson) as Agt
 import Data.Argonaut.Decode.Generic (genericDecodeJson) as Agt
 
-import Shared.Util.Instant (Instant)
-import Shared.Id (Id)
+import Y.Shared.Util.Instant (Instant)
+import Y.Shared.Id (Id)
 
 type Convo =
   { id :: Id "Convo"

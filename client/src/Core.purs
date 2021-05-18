@@ -1,4 +1,4 @@
-module Client.Core where
+module Y.Client.Core where
 
 import Prelude
 
@@ -9,9 +9,9 @@ import Data.Maybe (Maybe(..))
 import Data.List (List)
 import Data.List as List
 
-import Shared.Util.Instant (Instant)
-import Shared.Id (Id)
-import Shared.Convo (Event, Convo)
+import Y.Shared.Util.Instant (Instant)
+import Y.Shared.Id (Id)
+import Y.Shared.Convo (Event, Convo)
 
 type Model =
   { userId :: Id "User"

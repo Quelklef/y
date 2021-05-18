@@ -19,14 +19,14 @@ import Data.Traversable (for_)
 import Partial.Unsafe (unsafePartial)
 import Data.Newtype (unwrap)
 
-import Shared.Id (Id, newId)
-import Shared.Convo (Convo, Event)
-import Shared.Transmission (Transmission(..))
-import Shared.Config as Config
+import Y.Shared.Id (Id, newId)
+import Y.Shared.Convo (Convo, Event)
+import Y.Shared.Transmission (Transmission(..))
+import Y.Shared.Config as Config
 
-import Server.Util.Relation (Relation)
-import Server.Util.Relation as Relation
-import Server.WebSocket as Ws
+import Y.Server.Util.Relation (Relation)
+import Y.Server.Util.Relation as Relation
+import Y.Server.WebSocket as Ws
 
 type Client = Ws.Client Transmission (List Event)
 

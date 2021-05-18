@@ -1,4 +1,4 @@
-module Shared.Transmission where
+module Y.Shared.Transmission where
 
 import Data.Generic.Rep (class Generic)
 
@@ -7,8 +7,8 @@ import Data.Argonaut.Decode (class DecodeJson) as Agt
 import Data.Argonaut.Encode.Generic (genericEncodeJson) as Agt
 import Data.Argonaut.Decode.Generic (genericDecodeJson) as Agt
 
-import Shared.Id (Id)
-import Shared.Convo (Event)
+import Y.Shared.Id (Id)
+import Y.Shared.Convo (Event)
 
 -- | Message from client to server
 -- | Named "transmission" in order to reduce the number of things called "messages"

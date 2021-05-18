@@ -1,4 +1,4 @@
-module Client.View (view) where
+module Y.Client.View (view) where
 
 import Prelude
 
@@ -23,19 +23,19 @@ import Attribute as A
 import WHATWG.DOM.Event (target, currentTarget) as Wwg
 import WHATWG.HTML.KeyboardEvent (toMaybeKeyboardEvent, shiftKey, key) as Wwg
 
-import Shared.Util.Instant (Instant)
-import Shared.Id (Id)
-import Shared.Convo (Message, simulate)
+import Y.Shared.Util.Instant (Instant)
+import Y.Shared.Id (Id)
+import Y.Shared.Convo (Message, simulate)
 
-import Client.Util.Vec2 (Vec2)
-import Client.Util.Vec2 as Vec2
-import Client.Util.Is ((===))
-import Client.Util.Opts (Opts)
-import Client.Core (Model, Draft)
-import Client.Action (Action)
-import Client.Actions as Actions
-import Client.Arrange (arrange)
-import Client.CalcDims (calcDims)
+import Y.Client.Util.Vec2 (Vec2)
+import Y.Client.Util.Vec2 as Vec2
+import Y.Client.Util.Is ((===))
+import Y.Client.Util.Opts (Opts)
+import Y.Client.Core (Model, Draft)
+import Y.Client.Action (Action)
+import Y.Client.Actions as Actions
+import Y.Client.Arrange (arrange)
+import Y.Client.CalcDims (calcDims)
 
 data Card = Card_Message Message | Card_Draft Draft
 

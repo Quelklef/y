@@ -1,4 +1,4 @@
-module Client.App (runApp) where
+module Y.Client.App (runApp) where
 
 import Prelude
 

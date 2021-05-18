@@ -11,17 +11,17 @@ import Effect.Class (liftEffect)
 
 import Sub (Sub)
 
-import Shared.Id (Id, newId)
-import Shared.Convo (Event)
-import Shared.Transmission (Transmission(..))
-import Shared.Config as Config
+import Y.Shared.Id (Id, newId)
+import Y.Shared.Convo (Event)
+import Y.Shared.Transmission (Transmission(..))
+import Y.Shared.Config as Config
 
-import Client.App (runApp)
-import Client.Core (mkInitialModel)
-import Client.Action (Action, runActionMonad)
-import Client.View (view)
-import Client.WebSocket as Ws
-import Client.WebSocketClientToElmishSubscription (websocketClientToElmishSubscription)
+import Y.Client.App (runApp)
+import Y.Client.Core (mkInitialModel)
+import Y.Client.Action (Action, runActionMonad)
+import Y.Client.View (view)
+import Y.Client.WebSocket as Ws
+import Y.Client.WebSocketClientToElmishSubscription (websocketClientToElmishSubscription)
 
 foreign import initialize_f :: forall a b r.
   (Id a -> Id b -> r) ->

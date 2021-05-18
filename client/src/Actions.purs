@@ -1,4 +1,4 @@
-module Client.Actions where
+module Y.Client.Actions where
 
 import Prelude
 
@@ -10,14 +10,14 @@ import Effect (Effect)
 import Effect.Class (liftEffect)
 import Control.Monad.Reader.Class (ask)
 
-import Shared.Util.Instant (getNow)
-import Shared.Id (Id, newId)
-import Shared.Convo (EventPayload(..))
-import Shared.Transmission (Transmission(..))
+import Y.Shared.Util.Instant (getNow)
+import Y.Shared.Id (Id, newId)
+import Y.Shared.Convo (EventPayload(..))
+import Y.Shared.Transmission (Transmission(..))
 
-import Client.Core (Model, Draft)
-import Client.Action (Action)
-import Client.WebSocket as Ws
+import Y.Client.Core (Model, Draft)
+import Y.Client.Action (Action)
+import Y.Client.WebSocket as Ws
 
 noop :: Action
 noop = pure

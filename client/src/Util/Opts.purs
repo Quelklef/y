@@ -1,4 +1,4 @@
-module Client.Util.Opts where
+module Y.Client.Util.Opts where
 
 import Prelude
 

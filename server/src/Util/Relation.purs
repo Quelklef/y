@@ -1,4 +1,4 @@
-module Server.Util.Relation (Relation, empty, singleton, incl, excl, union, lexp, rexp, has, lget, rget) where
+module Y.Server.Util.Relation (Relation, empty, singleton, incl, excl, union, lexp, rexp, has, lget, rget) where
 
 import Prelude
 

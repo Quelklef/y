@@ -1,4 +1,4 @@
-module Shared.Id (Id, newId, parseId, isId) where
+module Y.Shared.Id (Id, newId, parseId, isId) where
 
 import Prelude
 

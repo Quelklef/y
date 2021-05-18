@@ -1,4 +1,4 @@
-module Client.WebSocketClientToElmishSubscription (websocketClientToElmishSubscription) where
+module Y.Client.WebSocketClientToElmishSubscription (websocketClientToElmishSubscription) where
 
 import Prelude
 
@@ -7,9 +7,9 @@ import Effect.Uncurried (EffectFn1, mkEffectFn1, runEffectFn1)
 
 import Sub (Sub, ForeignSub, Canceler, newBuilder, newForeign)
 
-import Shared.Util.Codable (class Decodable)
+import Y.Shared.Util.Codable (class Decodable)
 
-import Client.WebSocket (Client, onTransmission)
+import Y.Client.WebSocket (Client, onTransmission)
 
 -- | Turn a WebSocket @Client@ into an Elmish @Sub@
 -- | Note that the resulting @Sub@ is *not* cancellable

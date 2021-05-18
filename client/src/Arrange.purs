@@ -1,4 +1,4 @@
-module Client.Arrange where
+module Y.Client.Arrange where
 
 import Prelude
 
@@ -15,7 +15,7 @@ import Data.Function (on)
 import Data.Int as Int
 import Partial.Unsafe (unsafePartial)
 
-import Client.Util.Vec2 (Vec2(..), getX, getY)
+import Y.Client.Util.Vec2 (Vec2(..), getX, getY)
 
 type GetId node id = node -> id
 type GetDeps node id = node -> List id

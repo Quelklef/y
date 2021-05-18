@@ -1,4 +1,4 @@
-module Shared.Util.Instant where
+module Y.Shared.Util.Instant where
 
 import Prelude
 

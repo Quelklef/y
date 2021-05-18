@@ -1,4 +1,4 @@
-module Server.Database (load, push) where
+module Y.Server.Database (load, push) where
 
 import Prelude
 
@@ -14,8 +14,8 @@ import Data.Symbol (class IsSymbol)
 import Node.FS.Sync (readdir, readFile, writeFile)
 import Node.Buffer (Buffer)
 
-import Shared.Util.Codable (class Encodable, class Decodable, encode, decode)
-import Shared.Id (Id, parseId)
+import Y.Shared.Util.Codable (class Encodable, class Decodable, encode, decode)
+import Y.Shared.Id (Id, parseId)
 
 -- Our "database" will be the filesystem
 -- Why? Meh, why not.

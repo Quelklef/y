@@ -1,4 +1,4 @@
-module Client.CalcDims where
+module Y.Client.CalcDims where
 
 import Prelude
 
@@ -10,7 +10,7 @@ import Html (Html)
 import Platform as Platform
 import WHATWG.HTML.All (Element)
 
-import Client.Util.Memoize (memoize)
+import Y.Client.Util.Memoize (memoize)
 
 -- | An extremely naughty function which magically computes a node's rendered dimensions size
 calcDims :: forall msg. Html msg -> { width :: Number, height :: Number }

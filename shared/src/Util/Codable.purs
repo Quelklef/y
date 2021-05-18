@@ -1,4 +1,4 @@
-module Shared.Util.Codable where
+module Y.Shared.Util.Codable where
 
 import Prelude
 

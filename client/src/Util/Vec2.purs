@@ -1,4 +1,4 @@
-module Client.Util.Vec2 where
+module Y.Client.Util.Vec2 where
 
 import Prelude
 

@@ -1,4 +1,4 @@
-module Client.Action where
+module Y.Client.Action where
 
 import Prelude
 
@@ -10,11 +10,11 @@ import Control.Monad.Trans.Class (lift)
 import Control.Monad.Reader.Trans (ReaderT, runReaderT)
 import Control.Monad.Reader.Class (class MonadAsk, ask)
 
-import Shared.Transmission (Transmission)
-import Shared.Convo (Event)
+import Y.Shared.Transmission (Transmission)
+import Y.Shared.Convo (Event)
 
-import Client.WebSocket as Ws
-import Client.Core (Model)
+import Y.Client.WebSocket as Ws
+import Y.Client.Core (Model)
 
 type Action = Model -> ActionMonad Model
 
