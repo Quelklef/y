@@ -94,7 +94,7 @@ arrange getId getDeps getTime getDims =
         arrangeTierBasedOnArrangementSoFar :: Int -> Map id Vec2 -> List node -> Map id Vec2
         arrangeTierBasedOnArrangementSoFar tier soFar nodes =
           let
-            calcIdealX = \node -> node # getDeps # map (\dep -> lookup' dep soFar # getX) # average # fromMaybe 0.0
+            calcIdealX = \node -> node # getDeps # map (\dep -> lookup' dep soFar # getX) # average # fromMaybe 0.5
             nodesOrdered = nodes # List.sortBy (compare `on` \node -> calcIdealX node /\ getTime node)
             calcPortion = \node -> Int.toNumber (weight node) / Int.toNumber (sum $ map weight nodes)
             nodePlacements =

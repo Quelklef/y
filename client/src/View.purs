@@ -9,10 +9,12 @@ import Data.Set as Set
 import Data.List (List)
 import Data.List as List
 import Data.Maybe (Maybe(..), fromJust, fromMaybe, isNothing)
-import Data.Foldable (fold)
+import Data.Foldable (fold, minimumBy)
 import Data.Newtype (unwrap)
 import Data.Generic.Rep (class Generic)
+import Control.Alt ((<|>))
 import Partial.Unsafe (unsafePartial)
+import Data.Function (on)
 
 import Html (Html)
 import Html as H
@@ -21,6 +23,7 @@ import Attribute as A
 import WHATWG.DOM.Event (target, currentTarget) as Wwg
 import WHATWG.HTML.KeyboardEvent (toMaybeKeyboardEvent, shiftKey, key) as Wwg
 
+import Shared.Util.Instant (Instant)
 import Shared.Id (Id)
 import Shared.Convo (Message, simulate)
 
@@ -69,6 +72,10 @@ cardContent (Card_Draft d) = d.content
 cardAuthorId :: Card -> Maybe (Id "User")
 cardAuthorId (Card_Message m) = Just m.authorId
 cardAuthorId (Card_Draft _) = Nothing
+
+cardTime :: Card -> Instant
+cardTime (Card_Message m) = m.time
+cardTime (Card_Draft d) = d.timeCreated
 
 isDraft :: Card -> Boolean
 isDraft (Card_Message _) = false
@@ -138,8 +145,10 @@ viewBody model =
       , S.height "0"
       , S.top "50vh"
       , S.left "50vw"
-      , let offset = model.focused >>= (\focusedId -> Map.lookup focusedId positions) # fromMaybe zero # negate
+      , let firstCardId = cards # minimumBy (comparing cardTime) # map cardId
+            offset = (model.focused <|> firstCardId) >>= (\focusedId -> Map.lookup focusedId positions) # fromMaybe zero # negate
         in S.transform $ "translate(" <> show (Vec2.getX offset) <> "px" <> ", " <> show (Vec2.getY offset) <> "px" <> ")"
+      , S.transition "transform 0.075s ease-in-out"  -- hell yes
       ]
       [ ]
       (List.toUnfoldable $ cardHtmls <> arrowHtmls)
