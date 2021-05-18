@@ -28,4 +28,5 @@
 , "node-buffer"
 , "integers"
 , "debuggest"
+, "math"
 ]

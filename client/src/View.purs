@@ -2,8 +2,6 @@ module Client.View (view) where
 
 import Prelude
 
-import Debug as Debug
-
 import Data.Map (Map)
 import Data.Map as Map
 import Data.Set (Set)
@@ -12,7 +10,6 @@ import Data.List (List)
 import Data.List as List
 import Data.Maybe (Maybe(..), fromJust, fromMaybe, isNothing)
 import Data.Foldable (fold)
-import Data.Monoid (guard)
 import Data.Newtype (unwrap)
 import Data.Generic.Rep (class Generic)
 import Partial.Unsafe (unsafePartial)
@@ -30,7 +27,7 @@ import Shared.Convo (Message, simulate)
 import Client.Util.Vec2 (Vec2)
 import Client.Util.Vec2 as Vec2
 import Client.Util.Is ((===))
-import Client.Util.Opts (Opts, defOpts)
+import Client.Util.Opts (Opts)
 import Client.Core (Model, Draft)
 import Client.Action (Action)
 import Client.Actions as Actions
@@ -121,16 +118,28 @@ viewBody model =
     , S.left "0"
     , S.width "100vw"
     , S.height "100vh"
+    , S.overflow "hidden"
+    , S.outline "none"  -- was getting outlined on focus
     ]
-    [ guard (isNothing model.focused) $ onKey "Enter" defOpts pure Actions.createDraft
+    [ let -- v TODO: Map (Id "Message") Card
+        focusedDraft = model.drafts # Set.toUnfoldable # List.filter (\d -> Just d.id == model.focused) # (_ List.!! 0)
+        focusedIsMessageOrNothing = isNothing focusedDraft
+      in fold
+         [ onKey "Enter" (_ { shift = RequireNotPressed }) pure $
+                 if focusedIsMessageOrNothing then Actions.createDraft else Actions.noop
+         , onKey "Enter" (_ { shift = RequirePressed }) pure $
+                 focusedDraft # map Actions.sendMessage # fromMaybe Actions.noop
+         ]
     , A.tabindex "0"  -- required to pick up key presses
     ]
     [ H.divS
       [ S.position "absolute"
-      , S.top "50vh"
-      , S.left "50vw"
       , S.width "0"
       , S.height "0"
+      , S.top "50vh"
+      , S.left "50vw"
+      , let offset = model.focused >>= (\focusedId -> Map.lookup focusedId positions) # fromMaybe zero # negate
+        in S.transform $ "translate(" <> show (Vec2.getX offset) <> "px" <> ", " <> show (Vec2.getY offset) <> "px" <> ")"
       ]
       [ ]
       (List.toUnfoldable $ cardHtmls <> arrowHtmls)
@@ -140,7 +149,9 @@ viewCard :: Map (Id "User") String -> Boolean -> Boolean -> Vec2 -> Card -> Html
 viewCard userNames isFocused isSelected position card =
   H.divS
   [ S.position "absolute"
-  , S.zIndex "1"  -- above the arrows
+  , S.zIndex $
+      if isFocused then "2"  -- above other cards
+      else "1"  -- above the arrows
   , S.top $ (show (unwrap position).y) <> "px"
   , S.left $ (show (unwrap position).x) <> "px"
   , S.transform "translate(-50%, -50%)"  -- center the card
@@ -157,13 +168,10 @@ viewCard userNames isFocused isSelected position card =
   , S.fontFamily "sans-serif"
   , S.fontSize "13px"
   ]
-  [ A.onClick \model -> pure $ model { focused = Just (cardId card) }
-  , guard (not $ isDraft card) $ onKey "Enter" defOpts pure Actions.createDraft
-  ]
+  [ A.onClick \model -> pure $ model { focused = Just (cardId card) } ]
   [ H.divS
     [ ]
-    [ A.tabindex "0"  -- required to pick up key presses
-    ]
+    [ ]
     [ H.textareaS
       [ S.padding "0"
       , S.background "none"
@@ -181,7 +189,7 @@ viewCard userNames isFocused isSelected position card =
             A.disabled "disabled"
 
           Card_Draft draft -> fold
-            [ onKey "Enter" (_ { shift = true }) pure (Actions.sendMessage draft)
+            [ onKey "Enter" (_ { shift = RequirePressed }) pure (Actions.sendMessage draft)
             , A.onInput \text -> Actions.editDraft draft.id text
             ]
       ]
@@ -214,18 +222,31 @@ viewArrow { from, to } =
     [ ]
     [ ]
 
-onKey :: forall act. String -> Opts { self :: Boolean, shift :: Boolean } -> act -> act -> A.Attribute act
+
+data ShouldKeyBePressed = NoPreference | RequirePressed | RequireNotPressed
+
+onKey :: forall act.
+         String ->
+         Opts { self :: ShouldKeyBePressed, shift :: ShouldKeyBePressed } ->
+         act ->
+         act ->
+         A.Attribute act
+
 onKey key mkOpts actNoop actDoIt =
-  let opts = mkOpts { self: false, shift: false } in
+  let opts = mkOpts { self: NoPreference, shift: NoPreference } in
   A.on "keydown" \event -> pure $
     case Wwg.toMaybeKeyboardEvent event of
       Nothing -> actNoop
       Just keyEvent -> do
         let
           keyOk = Wwg.key keyEvent == key
-          selfOk = (opts.self `implies` _) $ Wwg.target keyEvent === Wwg.currentTarget keyEvent
-          shiftOk = (opts.shift `implies` _) $ Wwg.shiftKey keyEvent
+          selfOk = pressedOk opts.self $ Wwg.target keyEvent === Wwg.currentTarget keyEvent
+          shiftOk = pressedOk opts.shift $ Wwg.shiftKey keyEvent
           ok = keyOk && selfOk && shiftOk
         if ok then actDoIt else actNoop
 
-  where implies a b = not a || b
+  where
+    pressedOk shouldBePressed isPressed = case shouldBePressed of
+      NoPreference -> true
+      RequirePressed -> isPressed == true
+      RequireNotPressed -> isPressed == false

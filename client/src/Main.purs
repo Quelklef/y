@@ -28,6 +28,7 @@ foreign import initialize_f :: forall a b r.
   Id a -> Id b -> Effect r
 
 foreign import getHostname :: Effect String
+foreign import workaround_redirectFocusFromBodyToRoot :: Effect Unit
 
 main :: Effect Unit
 main = do
@@ -41,6 +42,9 @@ main = do
   hostname <- getHostname
   (wsClient :: Ws.Client Transmission (List Event))
     <- Ws.newConnection { url: "ws://" <> hostname <> ":" <> show Config.webSocketPort }
+
+  -- apply hacky workaround
+  workaround_redirectFocusFromBodyToRoot
 
   -- Start Elmish
   let sub = mkSub wsClient

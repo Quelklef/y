@@ -19,6 +19,9 @@ import Client.Core (Model, Draft)
 import Client.Action (Action)
 import Client.WebSocket as Ws
 
+noop :: Action
+noop = pure
+
 createDraft :: Action
 createDraft model = do
   (mid :: Id "Message") <- liftEffect newId
@@ -37,12 +40,12 @@ createDraft model = do
         , drafts = model.drafts <> Set.singleton draft
         }
 
-  liftEffect $ focusDraftAfterRender draft.id
+  liftEffect $ focusDraftTextareaAfterRender draft.id
 
   pure newModel
 
-focusDraftAfterRender :: Id "Message" -> Effect Unit
-focusDraftAfterRender draftId = do
+focusDraftTextareaAfterRender :: Id "Message" -> Effect Unit
+focusDraftTextareaAfterRender draftId = do
   -- Set the focus to the textarea once the draft has been rendered
   -- The implementation here is basically a giant hack:
   -- 1) We use setTimeout(, 0) to perform the .focus() after the render
