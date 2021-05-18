@@ -14,7 +14,6 @@ import Data.Newtype (unwrap)
 import Data.Generic.Rep (class Generic)
 import Control.Alt ((<|>))
 import Partial.Unsafe (unsafePartial)
-import Data.Function (on)
 
 import Html (Html)
 import Html as H
