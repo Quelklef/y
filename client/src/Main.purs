@@ -9,6 +9,7 @@ import Partial.Unsafe (unsafePartial)
 import Platform as Platform
 import Html (Html)
 import Html as H
+import Css as S
 import Attribute as A
 
 type Id = Int
@@ -45,10 +46,11 @@ view :: Model -> { head :: Array (Html Msg), body :: Array (Html Msg) }
 view boxes =
   { head: []
   , body:
-      [ H.button [ A.onClick $ Msg_SwapBoxesAndSetText 1 "new text for box #1" ] [ H.text "send message" ] ]
+      [ H.button [ A.onClick $ Msg_SwapBoxesAndSetText 1 "new text" ] [ H.text "swap boxes and set box #1 text to 'new text'" ] ]
       <>
       ( boxes # map \box ->
-          H.div
+          H.divS
+          [ S.backgroundColor $ if box.id == 1 then "rgba(200 0 0 / 20%)" else "rgba(0 200 0 / 20%)" ]
           [ ]
           [ H.p
             [ ]
