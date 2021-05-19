@@ -189,13 +189,10 @@ view model = { head: [], body: [bodyView] }
         , S.outline "none !important"
         , S.width "100%"
         ]
-        [ A.id $ "textarea-for-" <> unwrap card.id  -- hack for being able to set focus on the textareas
-        , case card.original of
-            CardOriginal_Message _ ->
-              A.disabled "disabled"
-
+        [ case card.original of
+            CardOriginal_Message _ -> mempty
             CardOriginal_Draft draft -> fold
-              [ A.onInput \text -> Actions.editDraft draft.id text
+              [ A.onInput \text m -> pure $ m { drafts = m.drafts # Set.map (\d -> if d.id == draft.id then d { content = text } else d) }
               ]
         ]
         [ H.text $ getContent card

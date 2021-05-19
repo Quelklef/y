@@ -23,13 +23,6 @@ import Y.Client.View (view)
 import Y.Client.WebSocket as Ws
 import Y.Client.WebSocketClientToElmishSubscription (websocketClientToElmishSubscription)
 
-foreign import initialize_f :: forall a b r.
-  (Id a -> Id b -> r) ->
-  Id a -> Id b -> Effect r
-
-foreign import getHostname :: Effect String
-foreign import workaround_redirectFocusFromBodyToRoot :: Effect Unit
-
 main :: Effect Unit
 main = do
 
