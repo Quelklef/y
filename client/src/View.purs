@@ -85,10 +85,8 @@ view :: Model -> { head :: Array (Html Action), body :: Array (Html Action) }
 view model = { head: [], body: [bodyView] }
   where
 
-  convoState = simulate model.convo.events
-
   cards :: List Card
-  cards = Set.toUnfoldable $ (<>) (Set.map mkCard_Message convoState.messages) (Set.map mkCard_Draft model.drafts)
+  cards = Set.toUnfoldable $ (<>) (Set.map mkCard_Message model.messages) (Set.map mkCard_Draft model.drafts)
 
   isDraft :: Card -> Boolean
   isDraft card = case card.original of
