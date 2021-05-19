@@ -25,13 +25,12 @@ import WHATWG.HTML.KeyboardEvent (toMaybeKeyboardEvent, shiftKey, key) as Wwg
 
 import Y.Shared.Util.Instant (Instant)
 import Y.Shared.Id (Id)
-import Y.Shared.Convo (Message, simulate)
 
 import Y.Client.Util.Vec2 (Vec2)
 import Y.Client.Util.Vec2 as Vec2
 import Y.Client.Util.Is ((===))
 import Y.Client.Util.Opts (Opts)
-import Y.Client.Core (Model, Draft)
+import Y.Client.Core (Model, Message)
 import Y.Client.Action (Action)
 import Y.Client.Actions as Actions
 import Y.Client.Arrange (arrange)
@@ -39,42 +38,20 @@ import Y.Client.CalcDims (calcDims)
 
 -- A card is a message or a draft plus computed info such as the shared fields
 -- The real solution here would be to use lenses
-data CardOriginal = CardOriginal_Message Message | CardOriginal_Draft Draft
 type Card =
-  { original :: CardOriginal
-  , id :: Id "Message"
-  , depIds :: Set (Id "Message")
+  { original :: Message
   , content :: String
-  , time :: Instant  -- time created (draft) or sent (message)
   }
 
 -- Temporary replacement for _.content
 getContent :: Card -> String
-getContent card = case card.original of
-  CardOriginal_Draft d -> d.content
-  CardOriginal_Message m -> m.content
+getContent card = card.original.content
 
 mkCard_Message :: Message -> Card
 mkCard_Message m =
-  { original: CardOriginal_Message m
-  , id: m.id
-  , depIds: m.depIds
+  { original: m
   , content: "<any string>"
-  , time: m.timeSent
   }
-
-mkCard_Draft :: Draft -> Card
-mkCard_Draft d =
-  { original: CardOriginal_Draft d
-  , id: d.id
-  , depIds: d.depIds
-  , content: d.content
-  , time: d.timeCreated
-  }
-
-derive instance genericCardOriginal :: Generic CardOriginal _
-derive instance eqCardOriginal :: Eq CardOriginal
-derive instance ordCardOriginal :: Ord CardOriginal
 
 --
 
@@ -86,12 +63,7 @@ view model = { head: [], body: [bodyView] }
   where
 
   cards :: List Card
-  cards = Set.toUnfoldable $ (<>) (Set.map mkCard_Message model.messages) (Set.map mkCard_Draft model.drafts)
-
-  isDraft :: Card -> Boolean
-  isDraft card = case card.original of
-    CardOriginal_Draft _ -> true
-    CardOriginal_Message _ -> false
+  cards = Set.toUnfoldable $ Set.map mkCard_Message model.messages
 
   bodyView :: Html Action
   bodyView =
@@ -111,7 +83,7 @@ view model = { head: [], body: [bodyView] }
     [ ]
     [ H.p
       [ ]
-      [ H.text $ if isDraft card then "DRAFT" else "MESSAGE" ]
+      [ H.text $ if card.original.isDraft then "DRAFT" else "MESSAGE" ]
     , H.textareaS
       [ S.padding "0"
       , S.background "none"
@@ -123,10 +95,8 @@ view model = { head: [], body: [bodyView] }
       , S.width "100%"
       ]
       [ case card.original of
-          CardOriginal_Message _ -> mempty
-          CardOriginal_Draft draft -> fold
-            [ A.onInput \text m -> pure $ m { drafts = m.drafts # Set.map (\d -> if d.id == draft.id then d { content = text } else d) }
-            ]
+          draft ->
+            A.onInput \text m -> pure $ m { messages = m.messages # Set.map (\d -> if d.id == draft.id then d { content = text } else d) }
       ]
       [ H.text $ getContent card
       ]
