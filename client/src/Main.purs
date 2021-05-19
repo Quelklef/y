@@ -4,8 +4,6 @@ import Prelude
 
 import Effect (Effect)
 import Effect.Uncurried (runEffectFn1)
-import Data.List (List)
-import Data.List as List
 import Data.Set (Set)
 import Data.Set as Set
 
@@ -13,16 +11,16 @@ import Platform as Platform
 import Html (Html)
 import Html as H
 import Attribute as A
-import Css as S
 
-type Msg = Model -> Model
+type Id = String
 
 type Model = Set Box
+data Msg = Msg_SetContent Id String
 
 type Box =
-  { id :: String
+  { id :: Id
   , content :: String
-  , isDraft :: Boolean
+  , label :: String
   }
 
 type Box' =
@@ -37,12 +35,12 @@ mkBox' box = { box, content: someRandomString }
 initialModel :: Model
 initialModel = Set.fromFoldable
   [ { id: "y-message-testing-1"
+    , label: "Box #1"
     , content: "I am message #1"
-    , isDraft: false
     }
   , { id: "y-message-testing-2"
+    , label: "Box #2"
     , content: ""
-    , isDraft: true
     }
   ]
 
@@ -51,37 +49,31 @@ main = do
   let app = Platform.app
         { init: \_ -> pure initialModel
         , subscriptions: \_ -> mempty
-        , update: \model msg -> pure (msg model)
+        , update: \model msg -> pure (update model msg)
         , view: view
         }
   (runEffectFn1 app) unit
 
---
+update :: Model -> Msg -> Model
+update boxes (Msg_SetContent boxId newContent) =
+  boxes # Set.map (\b -> if b.id == boxId then b { content = newContent } else b)
 
 view :: Model -> { head :: Array (Html Msg), body :: Array (Html Msg) }
-view boxes = { head: [], body: [bodyView] }
-  where
+view boxes =
+  { head: []
+  , body: boxes # Set.toUnfoldable # map mkBox' # map viewBox'
+  }
 
-  boxes' :: List Box'
-  boxes' = Set.toUnfoldable $ Set.map mkBox' boxes
-
-  bodyView :: Html Msg
-  bodyView =
-    H.div
+viewBox' :: Box' -> Html Msg
+viewBox' box' =
+  H.div
+  [ ]
+  [ H.p
     [ ]
-    ( List.toUnfoldable $ boxes' # map viewBox' )
-
-  viewBox' :: Box' -> Html Msg
-  viewBox' box' =
-    H.div
-    [ ]
-    [ H.p
-      [ ]
-      [ H.text $ if box'.box.isDraft then "DRAFT" else "MESSAGE" ]
-    , H.textareaS
-      [ ]
-      [ A.onInput \text messages ->  messages # Set.map (\d -> if d.id == box'.box.id then d { content = text } else d) ]
-      [ H.text $ box'.box.content ]
-    ]
+    [ H.text $ box'.box.label ]
+  , H.textarea
+    [ A.onInput \text -> Msg_SetContent box'.box.id text ]
+    [ H.text $ box'.box.content ]
+  ]
 
 
