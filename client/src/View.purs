@@ -90,126 +90,47 @@ view model = { head: [], body: [bodyView] }
   cards :: List Card
   cards = Set.toUnfoldable $ (<>) (Set.map mkCard_Message convoState.messages) (Set.map mkCard_Draft model.drafts)
 
-  cardsById :: Map (Id "Message") Card
-  cardsById = cards # map (\card -> card.id /\ card) # Map.fromFoldable
-
-  focusedCard :: Maybe Card
-  focusedCard = model.focusedId >>= \id -> cardsById # Map.lookup id
-
-  isFocused :: forall r. { id :: Id "Message" | r } -> Boolean
-  isFocused { id } = model.focusedId == Just id
-
-  isSelected :: forall r. { id :: Id "Message" | r } -> Boolean
-  isSelected { id } = model.selectedIds # Set.member id
-
   isDraft :: Card -> Boolean
   isDraft card = case card.original of
     CardOriginal_Draft _ -> true
     CardOriginal_Message _ -> false
 
-  positions =
-    arrange
-      { getId: _.id }
-      { getDeps: _.depIds >>> Set.toUnfoldable }
-      { getTime: _.time }
-      { getDims: calcDims <<< viewCard Vec2.origin }
-      cards
-
-  getPosition :: Id "Message" -> Maybe Vec2
-  getPosition id = positions # Map.lookup id
-
-  getAuthorName :: Id "User" -> Maybe String
-  getAuthorName id = convoState.userNames # Map.lookup id
-
   bodyView :: Html Action
   bodyView =
-    H.divS
-    [ S.position "absolute"
-    , S.top "0"
-    , S.left "0"
-    , S.width "100vw"
-    , S.height "100vh"
-    , S.overflow "hidden"
-    , S.outline "none"  -- was getting outlined on focus
-    ]
-    [ A.tabindex "0"  -- required to pick up key presses
-    ]
-    [ H.divS
-      [ S.position "absolute"
-      , S.width "0"
-      , S.height "0"
-      , S.top "50vh"
-      , S.left "50vw"
-      , let firstCard = cards # minimumBy (comparing _.time)
-            offset = (focusedCard <|> firstCard) # map _.id >>= getPosition # fromMaybe zero # negate
-        in S.transform $ "translate(" <> show (Vec2.getX offset) <> "px" <> ", " <> show (Vec2.getY offset) <> "px" <> ")"
-      , S.transition "transform 0.075s ease-in-out"  -- hell yes
-      ]
-      [ ]
-      $ let
-          cardHtmls = cards # map (\card -> card # viewCard (unsafeFromJust $ getPosition card.id))
+    H.div
+    [ ]
+    ( List.toUnfoldable $ cards # map viewCard )
 
-        in List.toUnfoldable cardHtmls
-    ]
-
-  viewCard :: Vec2 -> Card -> Html Action
-  viewCard position card =
+  viewCard :: Card -> Html Action
+  viewCard card =
     H.divS
-    [ S.position "absolute"
-    , S.zIndex $
-        if isFocused card then "2"  -- above other cards
-        else "1"  -- above the arrows
-    , S.top $ (show (unwrap position).y) <> "px"
-    , S.left $ (show (unwrap position).x) <> "px"
-    , S.transform "translate(-50%, -50%)"  -- center the card
-    , S.width "300px"
+    [ S.width "300px"
     , S.height "auto"
-    , S.display "inline-block"
-    , let borderColor = if isFocused card then "red" else if isSelected card then "blue" else "lightgrey"
-      in S.border $ "1px solid " <> borderColor
+    , S.border $ "1px solid black"
     , S.padding ".8rem 1.2rem"
-    , S.borderRadius ".3em"
-    , S.boxShadow "0 2px 6px -4px rgb(0 0 0 / 50%)"
-    , S.background "white"
-    , S.fontFamily "sans-serif"
-    , S.fontSize "13px"
+    , S.margin "40px 0"
     ]
-    [ A.onClick $ pure <<< (_ { focusedId = Just card.id }) ]
-    [ H.divS
+    [ ]
+    [ H.p
       [ ]
-      [ ]
-      [ H.textareaS
-        [ S.padding "0"
-        , S.background "none"
-        , S.resize "none"
-        , S.fontFamily "inherit"
-        , S.fontSize "inherit"
-        , S.color "inherit"
-        , S.border $ if isDraft card then "1px solid lightgrey" else "none"
-        , S.outline "none !important"
-        , S.width "100%"
-        ]
-        [ case card.original of
-            CardOriginal_Message _ -> mempty
-            CardOriginal_Draft draft -> fold
-              [ A.onInput \text m -> pure $ m { drafts = m.drafts # Set.map (\d -> if d.id == draft.id then d { content = text } else d) }
-              ]
-        ]
-        [ H.text $ getContent card
-        ]
+      [ H.text $ if isDraft card then "DRAFT" else "MESSAGE" ]
+    , H.textareaS
+      [ S.padding "0"
+      , S.background "none"
+      , S.resize "none"
+      , S.fontFamily "inherit"
+      , S.fontSize "inherit"
+      , S.color "inherit"
+      , S.outline "none !important"
+      , S.width "100%"
       ]
-    , H.divS
-      [ S.fontSize "0.75em"
-      , S.textAlign "right"
-      , S.fontStyle "italic"
-      , S.opacity "0.5"
-      ]
-      [ ]
       [ case card.original of
-          CardOriginal_Draft d ->
-            mempty
-          CardOriginal_Message m ->
-            H.text $ (unwrap card.id) <> " from " <> (m.authorId # getAuthorName # fromMaybe "<anonymous>")
+          CardOriginal_Message _ -> mempty
+          CardOriginal_Draft draft -> fold
+            [ A.onInput \text m -> pure $ m { drafts = m.drafts # Set.map (\d -> if d.id == draft.id then d { content = text } else d) }
+            ]
+      ]
+      [ H.text $ getContent card
       ]
     ]
 
