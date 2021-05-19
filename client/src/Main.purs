@@ -17,13 +17,22 @@ import Css as S
 
 type Msg = Model -> Model
 
-type Model = Set Message
+type Model = Set Box
 
-type Message =
+type Box =
   { id :: String
   , content :: String
   , isDraft :: Boolean
   }
+
+type Box' =
+  { box :: Box
+  , content :: String
+  }
+
+mkBox' :: Box -> Box'
+mkBox' box = { box, content: someRandomString }
+  where someRandomString = "some random string"
 
 initialModel :: Model
 initialModel = Set.fromFoldable
@@ -47,65 +56,32 @@ main = do
         }
   (runEffectFn1 app) unit
 
--- A card is a message or a draft plus computed info such as the shared fields
--- The real solution here would be to use lenses
-type Card =
-  { original :: Message
-  , content :: String
-  }
-
--- Temporary replacement for _.content
-getContent :: Card -> String
-getContent card = card.original.content
-
-mkCard_Message :: Message -> Card
-mkCard_Message m =
-  { original: m
-  , content: "<any string>"
-  }
-
 --
 
 view :: Model -> { head :: Array (Html Msg), body :: Array (Html Msg) }
-view model = { head: [], body: [bodyView] }
+view boxes = { head: [], body: [bodyView] }
   where
 
-  cards :: List Card
-  cards = Set.toUnfoldable $ Set.map mkCard_Message model
+  boxes' :: List Box'
+  boxes' = Set.toUnfoldable $ Set.map mkBox' boxes
 
   bodyView :: Html Msg
   bodyView =
     H.div
     [ ]
-    ( List.toUnfoldable $ cards # map viewCard )
+    ( List.toUnfoldable $ boxes' # map viewBox' )
 
-  viewCard :: Card -> Html Msg
-  viewCard card =
-    H.divS
-    [ S.width "300px"
-    , S.height "auto"
-    , S.border $ "1px solid black"
-    , S.padding ".8rem 1.2rem"
-    , S.margin "40px 0"
-    ]
+  viewBox' :: Box' -> Html Msg
+  viewBox' box' =
+    H.div
     [ ]
     [ H.p
       [ ]
-      [ H.text $ if card.original.isDraft then "DRAFT" else "MESSAGE" ]
+      [ H.text $ if box'.box.isDraft then "DRAFT" else "MESSAGE" ]
     , H.textareaS
-      [ S.padding "0"
-      , S.background "none"
-      , S.resize "none"
-      , S.fontFamily "inherit"
-      , S.fontSize "inherit"
-      , S.color "inherit"
-      , S.outline "none !important"
-      , S.width "100%"
-      ]
-      [ A.onInput \text messages ->  messages # Set.map (\d -> if d.id == card.original.id then d { content = text } else d)
-      ]
-      [ H.text $ getContent card
-      ]
+      [ ]
+      [ A.onInput \text messages ->  messages # Set.map (\d -> if d.id == box'.box.id then d { content = text } else d) ]
+      [ H.text $ box'.box.content ]
     ]
 
 
