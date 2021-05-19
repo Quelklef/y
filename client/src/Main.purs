@@ -3,69 +3,61 @@ module Main where
 import Prelude
 
 import Effect (Effect)
-import Effect.Console as Console
-import Data.List (List)
-import Data.Maybe (Maybe(..))
-import Data.Tuple.Nested ((/\))
-import Effect.Class (liftEffect)
+import Effect.Uncurried (runEffectFn1)
+import Partial.Unsafe (unsafePartial)
 
-import Sub (Sub)
+import Platform as Platform
+import Html (Html)
+import Html as H
+import Css as S
+import Attribute as A
 
-import Y.Shared.Id (Id, newId)
-import Y.Shared.Convo (Event)
-import Y.Shared.Transmission (Transmission(..))
-import Y.Shared.Config as Config
+type Id = Int
 
-import Y.Client.App (runApp)
-import Y.Client.Core (mkInitialModel)
-import Y.Client.Action (Action, runActionMonad)
-import Y.Client.View (view)
-import Y.Client.WebSocket as Ws
-import Y.Client.WebSocketClientToElmishSubscription (websocketClientToElmishSubscription)
+type Model = Array Box
+data Msg = Msg_SwapBoxesAndSetText Id String
 
-foreign import initialize_f :: forall a b r.
-  (Id a -> Id b -> r) ->
-  Id a -> Id b -> Effect r
+type Box = { id :: Id , text :: String }
 
-foreign import getHostname :: Effect String
-foreign import workaround_redirectFocusFromBodyToRoot :: Effect Unit
+initialModel :: Model
+initialModel =
+  [ { id: 1, text: "text A" }
+  , { id: 2, text: "text B" }
+  ]
 
 main :: Effect Unit
 main = do
+  let app = Platform.app
+        { init: \_ -> pure initialModel
+        , subscriptions: \_ -> mempty
+        , update: \model msg -> pure (update model msg)
+        , view: view
+        }
+  (runEffectFn1 app) unit
 
-  -- Initialize state
-  freshUserId /\ freshConvoId <- (/\) <$> newId <*> newId
-  userId /\ convoId <- initialize_f (/\) freshUserId freshConvoId
-  let initialModel = mkInitialModel userId convoId
-
-  -- Spin up websocket
-  hostname <- getHostname
-  (wsClient :: Ws.Client Transmission (List Event))
-    <- Ws.newConnection { url: "ws://" <> hostname <> ":" <> show Config.webSocketPort }
-
-  -- apply hacky workaround
-  workaround_redirectFocusFromBodyToRoot
-
-  -- Start Elmish
-  let sub = mkSub wsClient
-  runApp
-    { initialModel: initialModel
-    , subscriptions: const sub
-    , view: view
-    , interpret: runActionMonad { wsClient }
-    }
-
-  -- Kick the thing off!
-  wsClient # Ws.onOpen do
-    Console.log "WebSocket opened"
-    wsClient # Ws.transmit (Transmission_Subscribe { convoId })
-    wsClient # Ws.transmit (Transmission_Pull { convoId })
-
+update :: Model -> Msg -> Model
+update boxes (Msg_SwapBoxesAndSetText targetBoxId newText) =
+  boxes # map updateBox # swapOrder
   where
-    mkSub :: forall ts. Ws.Client ts (List Event) -> Sub Action
-    mkSub = websocketClientToElmishSubscription >>> map maybeEventsToAction
+    updateBox box = if box.id == targetBoxId then box { text = newText } else box
+    swapOrder = unsafePartial $ \[a, b] -> [b, a]
 
-    maybeEventsToAction :: Maybe (List Event) -> Action
-    maybeEventsToAction = case _ of
-      Nothing -> \model -> model <$ liftEffect (Console.warn "Events list failed to parse; doing nothing")
-      Just events -> \model -> pure $ model { convo = model.convo { events = model.convo.events <> events } }
+view :: Model -> { head :: Array (Html Msg), body :: Array (Html Msg) }
+view boxes =
+  { head: []
+  , body:
+      [ H.button [ A.onClick $ Msg_SwapBoxesAndSetText 1 "new text" ] [ H.text "swap boxes and set box #1 text to 'new text'" ] ]
+      <>
+      ( boxes # map \box ->
+          H.divS
+          [ S.backgroundColor $ if box.id == 1 then "rgba(200 0 0 / 20%)" else "rgba(0 200 0 / 20%)" ]
+          [ ]
+          [ H.p
+            [ ]
+            [ H.text $ "Box #" <> show box.id ]
+          , H.textarea
+            [ A.onInput \text -> Msg_SwapBoxesAndSetText box.id text ]
+            [ H.text $ box.text ]
+          ]
+      )
+  }
