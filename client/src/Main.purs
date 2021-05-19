@@ -3,32 +3,20 @@ module Main where
 import Prelude
 
 import Effect (Effect)
-import Effect.Console as Console
 import Data.List (List)
 import Data.List as List
-import Data.Maybe (Maybe(..), fromJust)
-import Data.Tuple.Nested ((/\))
+import Data.Maybe (Maybe, fromJust)
 import Data.Set (Set)
 import Data.Set as Set
-import Data.Newtype (wrap, unwrap)
 
-import Effect.Class (liftEffect)
 import Partial.Unsafe (unsafePartial)
 
-import Sub (Sub)
 import Html (Html)
 import Html as H
 import Attribute as A
 import Css as S
 
-import Y.Shared.Id (Id, newId)
-import Y.Shared.Convo (Event)
-import Y.Shared.Transmission (Transmission(..))
-import Y.Shared.Config as Config
-
 import Y.Client.App (runApp)
-import Y.Client.WebSocket as Ws
-import Y.Client.WebSocketClientToElmishSubscription (websocketClientToElmishSubscription)
 
 type Action = Model -> Effect Model
 
