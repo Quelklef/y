@@ -3,6 +3,7 @@ module Main where
 import Prelude
 
 import Effect (Effect)
+import Effect.Uncurried (runEffectFn1)
 import Data.List (List)
 import Data.List as List
 import Data.Maybe (Maybe, fromJust)
@@ -11,14 +12,13 @@ import Data.Set as Set
 
 import Partial.Unsafe (unsafePartial)
 
+import Platform as Platform
 import Html (Html)
 import Html as H
 import Attribute as A
 import Css as S
 
-import Y.Client.App (runApp)
-
-type Action = Model -> Effect Model
+type Action = Model -> Model
 
 type Message =
   { id :: String
@@ -51,12 +51,14 @@ main = do
   let initialModel = mkInitialModel
 
   -- Start Elmish
-  runApp
-    { initialModel: initialModel
-    , subscriptions: const mempty
-    , view: view
-    , interpret: identity
-    }
+  let app = Platform.app
+        { init: \_ -> pure initialModel
+        , subscriptions: \_ -> mempty
+        , update: \model msg -> pure (msg model)
+        , view: view
+        }
+
+  (runEffectFn1 app) unit
 
 -- A card is a message or a draft plus computed info such as the shared fields
 -- The real solution here would be to use lenses
@@ -118,7 +120,7 @@ view model = { head: [], body: [bodyView] }
       ]
       [ case card.original of
           draft ->
-            A.onInput \text m -> pure $ m { messages = m.messages # Set.map (\d -> if d.id == draft.id then d { content = text } else d) }
+            A.onInput \text m ->  m { messages = m.messages # Set.map (\d -> if d.id == draft.id then d { content = text } else d) }
       ]
       [ H.text $ getContent card
       ]
