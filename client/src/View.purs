@@ -61,9 +61,9 @@ cardId :: Card -> Id "Message"
 cardId (Card_Message m) = m.id
 cardId (Card_Draft d) = d.id
 
-cardDeps :: Card -> Set (Id "Message")
-cardDeps (Card_Message m) = m.deps
-cardDeps (Card_Draft d) = d.deps
+cardDepIds :: Card -> Set (Id "Message")
+cardDepIds (Card_Message m) = m.depIds
+cardDepIds (Card_Draft d) = d.depIds
 
 cardContent :: Card -> String
 cardContent (Card_Message m) = m.content
@@ -93,15 +93,15 @@ viewBody model =
     viewCard'needsPosition position card =
       viewCard
         convoState.userNames
-        (model.focused == Just (cardId card))
-        (model.selected # Set.member (cardId card))
+        (model.focusedId == Just (cardId card))
+        (model.selectedIds # Set.member (cardId card))
         position
         card
 
     positions =
       arrange
         cardId
-        (cardDeps >>> Set.toUnfoldable)
+        (cardDepIds >>> Set.toUnfoldable)
         (cardTime)
         (\card -> calcDims $ viewCard'needsPosition Vec2.origin card)
         cards
@@ -109,7 +109,7 @@ viewBody model =
     cardHtmls = cards # map \card -> let position = unsafePartial $ fromJust (Map.lookup (cardId card) positions)
                                      in viewCard'needsPosition position card
 
-    arrows = cards >>= \card -> cardDeps card # Set.toUnfoldable # map \dep ->
+    arrows = cards >>= \card -> cardDepIds card # Set.toUnfoldable # map \dep ->
       let from = unsafePartial $ fromJust $ positions # Map.lookup dep
           to   = unsafePartial $ fromJust $ positions # Map.lookup (cardId card)
       in { from, to }
@@ -127,7 +127,7 @@ viewBody model =
     , S.outline "none"  -- was getting outlined on focus
     ]
     [ let -- v TODO: Map (Id "Message") Card
-        focusedDraft = model.drafts # Set.toUnfoldable # List.filter (\d -> Just d.id == model.focused) # (_ List.!! 0)
+        focusedDraft = model.drafts # Set.toUnfoldable # List.filter (\d -> Just d.id == model.focusedId) # (_ List.!! 0)
         focusedIsMessageOrNothing = isNothing focusedDraft
       in fold
          [ onKey "Enter" (_ { shift = RequireNotPressed }) pure $
@@ -144,7 +144,7 @@ viewBody model =
       , S.top "50vh"
       , S.left "50vw"
       , let firstCardId = cards # minimumBy (comparing cardTime) # map cardId
-            offset = (model.focused <|> firstCardId) >>= (\focusedId -> Map.lookup focusedId positions) # fromMaybe zero # negate
+            offset = (model.focusedId <|> firstCardId) >>= (\focusedId -> Map.lookup focusedId positions) # fromMaybe zero # negate
         in S.transform $ "translate(" <> show (Vec2.getX offset) <> "px" <> ", " <> show (Vec2.getY offset) <> "px" <> ")"
       , S.transition "transform 0.075s ease-in-out"  -- hell yes
       ]
@@ -175,7 +175,7 @@ viewCard userNames isFocused isSelected position card =
   , S.fontFamily "sans-serif"
   , S.fontSize "13px"
   ]
-  [ A.onClick \model -> pure $ model { focused = Just (cardId card) } ]
+  [ A.onClick \model -> pure $ model { focusedId = Just (cardId card) } ]
   [ H.divS
     [ ]
     [ ]

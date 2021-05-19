@@ -61,7 +61,7 @@ type Message =
   , timeSent :: Instant
   , authorId :: Id "User"
   , convoId :: Id "Convo"
-  , deps :: Set (Id "Message")
+  , depIds :: Set (Id "Message")
   , content :: String
   }
 

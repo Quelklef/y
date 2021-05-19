@@ -29,14 +29,14 @@ createDraft model = do
 
   let (draft :: Draft) =
         { id: mid
-        , deps: model.selected <> (map Set.singleton model.focused # fromMaybe Set.empty)
+        , depIds: model.selectedIds <> (map Set.singleton model.focusedId # fromMaybe Set.empty)
         , content: ""
         , timeCreated: now
         }
 
   let (newModel :: Model) = model
-        { focused = Just mid
-        , selected = (Set.empty :: Set (Id "Message"))
+        { focusedId = Just mid
+        , selectedIds = (Set.empty :: Set (Id "Message"))
         , drafts = model.drafts <> Set.singleton draft
         }
 
@@ -84,7 +84,7 @@ sendMessage draft model = do
         , timeSent: now
         , authorId
         , convoId
-        , deps: draft.deps
+        , depIds: draft.depIds
         , content: draft.content
         }
 
