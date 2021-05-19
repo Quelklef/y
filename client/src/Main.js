@@ -33,7 +33,6 @@ exports.workaround_redirectFocusFromBodyToRoot =
 () =>
 {
   function redirect() {
-    console.log('redirect', document.activeElement);
     if (document.activeElement !== document.body) return;
 
     const err = `In order to redirect focus from body, expected body to have 1 child node, not ${document.body.childNodes.length}`;
@@ -41,7 +40,6 @@ exports.workaround_redirectFocusFromBodyToRoot =
     if (document.body.childNodes.length !== 1) console.warn(err);
 
     const root = document.body.childNodes[0];
-    console.log(root);
     root.tabIndex = '0';  // fuck
     if (root) root.focus();
   }

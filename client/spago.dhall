@@ -24,7 +24,6 @@
   , "whatwg-html"
   , "bifunctors"
   , "integers"
-  , "debuggest"
   , "math"
   , "control"
   ] 

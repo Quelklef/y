@@ -15,15 +15,13 @@ import Partial.Unsafe (unsafePartial)
 
 import Y.Client.Util.Vec2 (Vec2(..), getX, getY)
 
-type GetId node id = node -> id
-type GetDeps node id = node -> List id
-type GetTime node time = node -> time
-type GetDims node = node -> { width :: Number, height :: Number }
-
 calcTiers :: forall node id. Ord node => Eq id =>
-             GetId node id -> GetDeps node id ->
-             List node -> Map node Int
-calcTiers getId getDeps nodes =
+             { getId :: node -> id } ->
+             { getDeps :: node -> List id } ->
+             List node ->
+             Map node Int
+
+calcTiers { getId } { getDeps } nodes =
   let roots = nodes # List.filter (getDeps >>> List.null)
   in go roots 0
   where
@@ -37,9 +35,14 @@ calcTiers getId getDeps nodes =
     unionR = flip Map.union  -- right-biased union
 
 arrange :: forall node time id. Ord node => Ord time => Ord id =>
-           GetId node id -> GetDeps node id -> GetTime node time -> GetDims node ->
-           List node -> Map id Vec2
-arrange getId getDeps getTime getDims = unsafePartial $
+           { getId :: node -> id } ->
+           { getDeps :: node -> List id } ->
+           { getTime :: node -> time } ->
+           { getDims :: node -> { width :: Number, height :: Number } } ->
+           List node ->
+           Map id Vec2
+
+arrange { getId } { getDeps } { getTime } { getDims } = unsafePartial $
           stage_1'formativeArrangement
       >>> stage_2'normalization
       >>> stage_3'jostling
@@ -61,7 +64,7 @@ arrange getId getDeps getTime getDims = unsafePartial $
     stage_1'formativeArrangement :: Partial => List node -> Map id Vec2
     stage_1'formativeArrangement allNodes = go 0 Map.empty
       where
-        tierByNode = calcTiers getId getDeps allNodes
+        tierByNode = calcTiers { getId } { getDeps } allNodes
         nodesByTier = invertMap tierByNode
         allTiers = Map.keys nodesByTier # List.fromFoldable
 
@@ -108,10 +111,10 @@ arrange getId getDeps getTime getDims = unsafePartial $
       let
         xs = placements # map getX
         ys = placements # map getY
-        xRange = fromJust (maximum xs) - fromJust (minimum xs)
-        yRange = fromJust (maximum ys) - fromJust (minimum ys)
+        xRange = fromJust (maximum xs) - fromJust (minimum xs) # max 1.0
+        yRange = fromJust (maximum ys) - fromJust (minimum ys) # max 1.0
         nodeCount = placements # Map.keys # length
-        targetXRange = Int.toNumber $ nodeCount * 80
+        targetXRange = Int.toNumber $ nodeCount * 500
         targetYRange = Int.toNumber $ nodeCount * 50
         xScale = targetXRange / xRange
         yScale = targetYRange / yRange

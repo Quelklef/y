@@ -8,7 +8,8 @@ import Data.Set (Set)
 import Data.Set as Set
 import Data.List (List)
 import Data.List as List
-import Data.Maybe (Maybe(..), fromJust, fromMaybe, isNothing)
+import Data.Maybe (Maybe(..), fromJust, fromMaybe)
+import Data.Tuple.Nested ((/\))
 import Data.Foldable (fold, minimumBy)
 import Data.Newtype (unwrap)
 import Data.Generic.Rep (class Generic)
@@ -36,87 +37,92 @@ import Y.Client.Actions as Actions
 import Y.Client.Arrange (arrange)
 import Y.Client.CalcDims (calcDims)
 
-data Card = Card_Message Message | Card_Draft Draft
+-- A card is a message or a draft plus computed info such as the shared fields
+-- The real solution here would be to use lenses
+data CardOriginal = CardOriginal_Message Message | CardOriginal_Draft Draft
+type Card =
+  { original :: CardOriginal
+  , id :: Id "Message"
+  , depIds :: Set (Id "Message")
+  --, content :: String  -- temporarily elided due to a bug in Elmish
+  , time :: Instant  -- time created (draft) or sent (message)
+  }
 
--- Mason's solution to the card problem
---uncard :: ({ id ::, deps ::, content :: } -> r) -> Card -> r
---uncard f (Card_Message m) = f m
---uncard f (Card_Draft f) = f d
+-- Temporary replacement for _.content
+getContent :: Card -> String
+getContent card = case card.original of
+  CardOriginal_Draft d -> d.content
+  CardOriginal_Message m -> m.content
 
--- Another solution
---class Card c where
---  id ::
---  deps ::
---  content ::
+mkCard_Message :: Message -> Card
+mkCard_Message m =
+  { original: CardOriginal_Message m
+  , id: m.id
+  , depIds: m.depIds
+  --, content: m.content
+  , time: m.timeSent
+  }
 
-derive instance genericCard :: Generic Card _
-derive instance eqCard :: Eq Card
-derive instance ordCard :: Ord Card
+mkCard_Draft :: Draft -> Card
+mkCard_Draft d =
+  { original: CardOriginal_Draft d
+  , id: d.id
+  , depIds: d.depIds
+  --, content: d.content
+  , time: d.timeCreated
+  }
 
--- Hmmm, maybe there's a nicer way to this card* stuff.
--- ... typeclasses?
--- (^^ TODO ^^)
+derive instance genericCardOriginal :: Generic CardOriginal _
+derive instance eqCardOriginal :: Eq CardOriginal
+derive instance ordCardOriginal :: Ord CardOriginal
 
-cardId :: Card -> Id "Message"
-cardId (Card_Message m) = m.id
-cardId (Card_Draft d) = d.id
+--
 
-cardDepIds :: Card -> Set (Id "Message")
-cardDepIds (Card_Message m) = m.depIds
-cardDepIds (Card_Draft d) = d.depIds
-
-cardContent :: Card -> String
-cardContent (Card_Message m) = m.content
-cardContent (Card_Draft d) = d.content
-
-cardAuthorId :: Card -> Maybe (Id "User")
-cardAuthorId (Card_Message m) = Just m.authorId
-cardAuthorId (Card_Draft _) = Nothing
-
-cardTime :: Card -> Instant
-cardTime (Card_Message m) = m.timeSent
-cardTime (Card_Draft d) = d.timeCreated
-
-isDraft :: Card -> Boolean
-isDraft (Card_Message _) = false
-isDraft (Card_Draft _) = true
+unsafeFromJust :: forall a. Maybe a -> a
+unsafeFromJust m = unsafePartial $ fromJust m
 
 view :: Model -> { head :: Array (Html Action), body :: Array (Html Action) }
-view model = { head: [], body: [viewBody model] }
+view model = { head: [], body: [bodyView] }
+  where
 
-viewBody :: Model -> Html Action
-viewBody model =
-  let
-    convoState = simulate model.convo.events
-    (cards :: List Card) = Set.toUnfoldable $ (<>) (Set.map Card_Message convoState.messages) (Set.map Card_Draft model.drafts)
+  convoState = simulate model.convo.events
 
-    viewCard'needsPosition position card =
-      viewCard
-        convoState.userNames
-        (model.focusedId == Just (cardId card))
-        (model.selectedIds # Set.member (cardId card))
-        position
-        card
+  cards :: List Card
+  cards = Set.toUnfoldable $ (<>) (Set.map mkCard_Message convoState.messages) (Set.map mkCard_Draft model.drafts)
 
-    positions =
-      arrange
-        cardId
-        (cardDepIds >>> Set.toUnfoldable)
-        (cardTime)
-        (\card -> calcDims $ viewCard'needsPosition Vec2.origin card)
-        cards
+  cardsById :: Map (Id "Message") Card
+  cardsById = cards # map (\card -> card.id /\ card) # Map.fromFoldable
 
-    cardHtmls = cards # map \card -> let position = unsafePartial $ fromJust (Map.lookup (cardId card) positions)
-                                     in viewCard'needsPosition position card
+  focusedCard :: Maybe Card
+  focusedCard = model.focusedId >>= \id -> cardsById # Map.lookup id
 
-    arrows = cards >>= \card -> cardDepIds card # Set.toUnfoldable # map \dep ->
-      let from = unsafePartial $ fromJust $ positions # Map.lookup dep
-          to   = unsafePartial $ fromJust $ positions # Map.lookup (cardId card)
-      in { from, to }
+  isFocused :: forall r. { id :: Id "Message" | r } -> Boolean
+  isFocused { id } = model.focusedId == Just id
 
-    arrowHtmls = arrows # map viewArrow
+  isSelected :: forall r. { id :: Id "Message" | r } -> Boolean
+  isSelected { id } = model.selectedIds # Set.member id
 
-  in
+  isDraft :: Card -> Boolean
+  isDraft card = case card.original of
+    CardOriginal_Draft _ -> true
+    CardOriginal_Message _ -> false
+
+  positions =
+    arrange
+      { getId: _.id }
+      { getDeps: _.depIds >>> Set.toUnfoldable }
+      { getTime: _.time }
+      { getDims: calcDims <<< viewCard Vec2.origin }
+      cards
+
+  getPosition :: Id "Message" -> Maybe Vec2
+  getPosition id = positions # Map.lookup id
+
+  getAuthorName :: Id "User" -> Maybe String
+  getAuthorName id = convoState.userNames # Map.lookup id
+
+  bodyView :: Html Action
+  bodyView =
     H.divS
     [ S.position "absolute"
     , S.top "0"
@@ -126,16 +132,12 @@ viewBody model =
     , S.overflow "hidden"
     , S.outline "none"  -- was getting outlined on focus
     ]
-    [ let -- v TODO: Map (Id "Message") Card
-        focusedDraft = model.drafts # Set.toUnfoldable # List.filter (\d -> Just d.id == model.focusedId) # (_ List.!! 0)
-        focusedIsMessageOrNothing = isNothing focusedDraft
-      in fold
-         [ onKey "Enter" (_ { shift = RequireNotPressed }) pure $
-                 if focusedIsMessageOrNothing then Actions.createDraft else Actions.noop
-         , onKey "Enter" (_ { shift = RequirePressed }) pure $
-                 focusedDraft # map Actions.sendMessage # fromMaybe Actions.noop
-         ]
-    , A.tabindex "0"  -- required to pick up key presses
+    [ A.tabindex "0"  -- required to pick up key presses
+    , case focusedCard # map _.original of
+        Just (CardOriginal_Draft draft) ->
+           onKey "Enter" (_ { shift = RequirePressed }) pure $ Actions.sendMessage draft
+        _ ->
+           onKey "Enter" (_ { shift = RequireNotPressed }) pure Actions.createDraft
     ]
     [ H.divS
       [ S.position "absolute"
@@ -143,91 +145,103 @@ viewBody model =
       , S.height "0"
       , S.top "50vh"
       , S.left "50vw"
-      , let firstCardId = cards # minimumBy (comparing cardTime) # map cardId
-            offset = (model.focusedId <|> firstCardId) >>= (\focusedId -> Map.lookup focusedId positions) # fromMaybe zero # negate
+      , let firstCard = cards # minimumBy (comparing _.time)
+            offset = (focusedCard <|> firstCard) # map _.id >>= getPosition # fromMaybe zero # negate
         in S.transform $ "translate(" <> show (Vec2.getX offset) <> "px" <> ", " <> show (Vec2.getY offset) <> "px" <> ")"
       , S.transition "transform 0.075s ease-in-out"  -- hell yes
       ]
       [ ]
-      (List.toUnfoldable $ cardHtmls <> arrowHtmls)
+      $ let
+          arrows = cards >>= \card -> card.depIds
+                                    # Set.toUnfoldable
+                                    # map \dep -> { from: unsafeFromJust $ getPosition dep
+                                                  , to: unsafeFromJust $ getPosition card.id }
+          arrowHtmls = arrows # map viewArrow
+          cardHtmls = cards # map (\card -> card # viewCard (unsafeFromJust $ getPosition card.id))
+
+        in List.toUnfoldable (cardHtmls <> arrowHtmls)
     ]
 
-viewCard :: Map (Id "User") String -> Boolean -> Boolean -> Vec2 -> Card -> Html Action
-viewCard userNames isFocused isSelected position card =
-  H.divS
-  [ S.position "absolute"
-  , S.zIndex $
-      if isFocused then "2"  -- above other cards
-      else "1"  -- above the arrows
-  , S.top $ (show (unwrap position).y) <> "px"
-  , S.left $ (show (unwrap position).x) <> "px"
-  , S.transform "translate(-50%, -50%)"  -- center the card
-  , S.width "300px"
-  , S.height "auto"
-  , S.display "inline-block"
+  viewCard :: Vec2 -> Card -> Html Action
+  viewCard position card =
+    H.divS
+    [ S.position "absolute"
+    , S.zIndex $
+        if isFocused card then "2"  -- above other cards
+        else "1"  -- above the arrows
+    , S.top $ (show (unwrap position).y) <> "px"
+    , S.left $ (show (unwrap position).x) <> "px"
+    , S.transform "translate(-50%, -50%)"  -- center the card
+    , S.width "300px"
+    , S.height "auto"
+    , S.display "inline-block"
+    , let borderColor = if isFocused card then "red" else if isSelected card then "blue" else "lightgrey"
+      in S.border $ "1px solid " <> borderColor
+    , S.padding ".8rem 1.2rem"
+    , S.borderRadius ".3em"
+    , S.boxShadow "0 2px 6px -4px rgb(0 0 0 / 50%)"
+    , S.background "white"
+    , S.fontFamily "sans-serif"
+    , S.fontSize "13px"
+    ]
+    [ A.onClick $ pure <<< (_ { focusedId = Just card.id }) ]
+    [ H.divS
+      [ ]
+      [ ]
+      [ H.textareaS
+        [ S.padding "0"
+        , S.background "none"
+        , S.resize "none"
+        , S.fontFamily "inherit"
+        , S.fontSize "inherit"
+        , S.color "inherit"
+        , S.border $ if isDraft card then "1px solid lightgrey" else "none"
+        , S.outline "none !important"
+        , S.width "100%"
+        ]
+        [ A.id $ "textarea-for-" <> unwrap card.id  -- hack for being able to set focus on the textareas
+        , case card.original of
+            CardOriginal_Message _ ->
+              A.disabled "disabled"
 
-  , let borderColor = if isFocused then "red" else if isSelected then "blue" else "lightgrey"
-    in S.border $ "1px solid " <> borderColor
-  , S.padding ".8rem 1.2rem"
-  , S.borderRadius ".3em"
-  , S.boxShadow "0 2px 6px -4px rgb(0 0 0 / 50%)"
-  , S.background "white"
-  , S.fontFamily "sans-serif"
-  , S.fontSize "13px"
-  ]
-  [ A.onClick \model -> pure $ model { focusedId = Just (cardId card) } ]
-  [ H.divS
-    [ ]
-    [ ]
-    [ H.textareaS
-      [ S.padding "0"
-      , S.background "none"
-      , S.resize "none"
-      , S.fontFamily "inherit"
-      , S.fontSize "inherit"
-      , S.color "inherit"
-      , S.border $ if isDraft card then "1px solid lightgrey" else "none"
-      , S.outline "none !important"
-      , S.width "100%"
+            CardOriginal_Draft draft -> fold
+              [ onKey "Enter" (_ { shift = RequirePressed }) pure (Actions.sendMessage draft)
+              , A.onInput \text -> Actions.editDraft draft.id text
+              ]
+        ]
+        [ H.text $ getContent card
+        ]
       ]
-      [ A.id $ "textarea-for-" <> unwrap (cardId card)  -- hack for being able to set focus on the textareas
-      , case card of
-          Card_Message _ ->
-            A.disabled "disabled"
-
-          Card_Draft draft -> fold
-            [ onKey "Enter" (_ { shift = RequirePressed }) pure (Actions.sendMessage draft)
-            , A.onInput \text -> Actions.editDraft draft.id text
-            ]
+    , H.divS
+      [ S.fontSize "0.75em"
+      , S.textAlign "right"
+      , S.fontStyle "italic"
+      , S.opacity "0.5"
       ]
-      [ H.text $ cardContent card ]
+      [ ]
+      [ case card.original of
+          CardOriginal_Draft d ->
+            mempty
+          CardOriginal_Message m ->
+            H.text $ (unwrap card.id) <> " from " <> (m.authorId # getAuthorName # fromMaybe "<anonymous>")
+      ]
     ]
-  , H.divS
-    [ S.fontSize "0.75em"
-    , S.textAlign "right"
-    , S.fontStyle "italic"
-    , S.opacity "0.5"
-    ]
-    [ ]
-    [ let authorName = cardAuthorId card >>= flip Map.lookup userNames # fromMaybe "<anonymous>"
-      in H.text $ (unwrap $ cardId card) <> " from " <> authorName ]
-  ]
 
-viewArrow :: forall msg. { from :: Vec2, to :: Vec2 } -> Html msg
-viewArrow { from, to } =
-  H.spanS
-    [ S.display "inline-block"
-    , S.position "absolute"
-    , S.background "url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAOUlEQVQoU2N89uzZfwY0ICUlxYguxohNIUgRumKwTmIUw60gpBjFLfgUk66QKKsJKQJ5mPjgITbAAdzAKAuIG+NRAAAAAElFTkSuQmCC) repeat"
-    , S.height "10px"
-    , S.width $ show (Vec2.mag $ to - from) <> "px"
-    , S.top $ show (Vec2.getY from) <> "px"
-    , S.left $ show (Vec2.getX from) <> "px"
-    , S.transform $ "rotate(" <> show (Vec2.angle $ to - from) <> "rad)"
-    , S.transformOrigin "center left"
-    ]
-    [ ]
-    [ ]
+  viewArrow :: forall msg. { from :: Vec2, to :: Vec2 } -> Html msg
+  viewArrow { from, to } =
+    H.spanS
+      [ S.display "inline-block"
+      , S.position "absolute"
+      , S.background "url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAOUlEQVQoU2N89uzZfwY0ICUlxYguxohNIUgRumKwTmIUw60gpBjFLfgUk66QKKsJKQJ5mPjgITbAAdzAKAuIG+NRAAAAAElFTkSuQmCC) repeat"
+      , S.height "10px"
+      , S.width $ show (Vec2.mag $ to - from) <> "px"
+      , S.top $ show (Vec2.getY from) <> "px"
+      , S.left $ show (Vec2.getX from) <> "px"
+      , S.transform $ "rotate(" <> show (Vec2.angle $ to - from) <> "rad)"
+      , S.transformOrigin "center left"
+      ]
+      [ ]
+      [ ]
 
 
 data ShouldKeyBePressed = NoPreference | RequirePressed | RequireNotPressed
