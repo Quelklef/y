@@ -33,7 +33,7 @@ import Y.Client.WebSocketClientToElmishSubscription (websocketClientToElmishSubs
 type Action = Model -> Effect Model
 
 type Message =
-  { id :: Id "Message"
+  { id :: String
   , content :: String
   , isDraft :: Boolean
   }
@@ -45,11 +45,11 @@ type Model =
 mkInitialModel :: Model
 mkInitialModel =
   { messages: Set.fromFoldable
-    [ { id: wrap "y-message-testing-1"
+    [ { id: "y-message-testing-1"
       , content: "I am message #1"
       , isDraft: false
       }
-    , { id: wrap "y-message-testing-2"
+    , { id: "y-message-testing-2"
       , content: ""
       , isDraft: true
       }
