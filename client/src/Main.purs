@@ -16,31 +16,12 @@ type Id = Int
 type Model = Array Box
 data Msg = Msg_SwapBoxesAndSetText Id String
 
-type Box =
-  { id :: Id
-  , text :: String
-  , label :: String
-  }
-
-type Box' =
-  { box :: Box
-  , text :: String
-  }
-
-mkBox' :: Box -> Box'
-mkBox' box = { box, text: someRandomString }
-  where someRandomString = "some random string"
+type Box = { id :: Id , text :: String }
 
 initialModel :: Model
 initialModel =
-  [ { id: 1
-    , label: "Box #1"
-    , text: "text A"
-    }
-  , { id: 2
-    , label: "Box #2"
-    , text: "text B"
-    }
+  [ { id: 1, text: "text A" }
+  , { id: 2, text: "text B" }
   ]
 
 main :: Effect Unit
@@ -60,23 +41,21 @@ update boxes (Msg_SwapBoxesAndSetText targetBoxId newText) =
     updateBox box = if box.id == targetBoxId then box { text = newText } else box
     swapOrder = unsafePartial $ \[a, b] -> [b, a]
 
-
 view :: Model -> { head :: Array (Html Msg), body :: Array (Html Msg) }
 view boxes =
   { head: []
-  , body: boxes # map mkBox' # map viewBox'
+  , body:
+      [ H.button [ A.onClick $ Msg_SwapBoxesAndSetText 1 "new text for box #1" ] [ H.text "send message" ] ]
+      <>
+      ( boxes # map \box ->
+          H.div
+          [ ]
+          [ H.p
+            [ ]
+            [ H.text $ "Box #" <> show box.id ]
+          , H.textarea
+            [ A.onInput \text -> Msg_SwapBoxesAndSetText box.id text ]
+            [ H.text $ box.text ]
+          ]
+      )
   }
-
-viewBox' :: Box' -> Html Msg
-viewBox' box' =
-  H.div
-  [ ]
-  [ H.p
-    [ ]
-    [ H.text $ box'.box.label ]
-  , H.textarea
-    [ A.onInput \text -> Msg_SwapBoxesAndSetText box'.box.id text ]
-    [ H.text $ box'.box.text ]
-  ]
-
-
