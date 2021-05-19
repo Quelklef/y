@@ -44,7 +44,7 @@ type Card =
   { original :: CardOriginal
   , id :: Id "Message"
   , depIds :: Set (Id "Message")
-  --, content :: String  -- temporarily elided due to a bug in Elmish
+  , content :: String
   , time :: Instant  -- time created (draft) or sent (message)
   }
 
@@ -59,7 +59,7 @@ mkCard_Message m =
   { original: CardOriginal_Message m
   , id: m.id
   , depIds: m.depIds
-  --, content: m.content
+  , content: "<any string>"
   , time: m.timeSent
   }
 
@@ -68,7 +68,7 @@ mkCard_Draft d =
   { original: CardOriginal_Draft d
   , id: d.id
   , depIds: d.depIds
-  --, content: d.content
+  , content: d.content
   , time: d.timeCreated
   }
 
@@ -133,11 +133,6 @@ view model = { head: [], body: [bodyView] }
     , S.outline "none"  -- was getting outlined on focus
     ]
     [ A.tabindex "0"  -- required to pick up key presses
-    , case focusedCard # map _.original of
-        Just (CardOriginal_Draft draft) ->
-           onKey "Enter" (_ { shift = RequirePressed }) pure $ Actions.sendMessage draft
-        _ ->
-           onKey "Enter" (_ { shift = RequireNotPressed }) pure Actions.createDraft
     ]
     [ H.divS
       [ S.position "absolute"
@@ -152,14 +147,9 @@ view model = { head: [], body: [bodyView] }
       ]
       [ ]
       $ let
-          arrows = cards >>= \card -> card.depIds
-                                    # Set.toUnfoldable
-                                    # map \dep -> { from: unsafeFromJust $ getPosition dep
-                                                  , to: unsafeFromJust $ getPosition card.id }
-          arrowHtmls = arrows # map viewArrow
           cardHtmls = cards # map (\card -> card # viewCard (unsafeFromJust $ getPosition card.id))
 
-        in List.toUnfoldable (cardHtmls <> arrowHtmls)
+        in List.toUnfoldable cardHtmls
     ]
 
   viewCard :: Vec2 -> Card -> Html Action
@@ -205,8 +195,7 @@ view model = { head: [], body: [bodyView] }
               A.disabled "disabled"
 
             CardOriginal_Draft draft -> fold
-              [ onKey "Enter" (_ { shift = RequirePressed }) pure (Actions.sendMessage draft)
-              , A.onInput \text -> Actions.editDraft draft.id text
+              [ A.onInput \text -> Actions.editDraft draft.id text
               ]
         ]
         [ H.text $ getContent card
@@ -227,47 +216,4 @@ view model = { head: [], body: [bodyView] }
       ]
     ]
 
-  viewArrow :: forall msg. { from :: Vec2, to :: Vec2 } -> Html msg
-  viewArrow { from, to } =
-    H.spanS
-      [ S.display "inline-block"
-      , S.position "absolute"
-      , S.background "url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAOUlEQVQoU2N89uzZfwY0ICUlxYguxohNIUgRumKwTmIUw60gpBjFLfgUk66QKKsJKQJ5mPjgITbAAdzAKAuIG+NRAAAAAElFTkSuQmCC) repeat"
-      , S.height "10px"
-      , S.width $ show (Vec2.mag $ to - from) <> "px"
-      , S.top $ show (Vec2.getY from) <> "px"
-      , S.left $ show (Vec2.getX from) <> "px"
-      , S.transform $ "rotate(" <> show (Vec2.angle $ to - from) <> "rad)"
-      , S.transformOrigin "center left"
-      ]
-      [ ]
-      [ ]
 
-
-data ShouldKeyBePressed = NoPreference | RequirePressed | RequireNotPressed
-
-onKey :: forall act.
-         String ->
-         Opts { self :: ShouldKeyBePressed, shift :: ShouldKeyBePressed } ->
-         act ->
-         act ->
-         A.Attribute act
-
-onKey key mkOpts actNoop actDoIt =
-  let opts = mkOpts { self: NoPreference, shift: NoPreference } in
-  A.on "keydown" \event -> pure $
-    case Wwg.toMaybeKeyboardEvent event of
-      Nothing -> actNoop
-      Just keyEvent -> do
-        let
-          keyOk = Wwg.key keyEvent == key
-          selfOk = pressedOk opts.self $ Wwg.target keyEvent === Wwg.currentTarget keyEvent
-          shiftOk = pressedOk opts.shift $ Wwg.shiftKey keyEvent
-          ok = keyOk && selfOk && shiftOk
-        if ok then actDoIt else actNoop
-
-  where
-    pressedOk shouldBePressed isPressed = case shouldBePressed of
-      NoPreference -> true
-      RequirePressed -> isPressed == true
-      RequireNotPressed -> isPressed == false

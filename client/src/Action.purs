@@ -16,7 +16,7 @@ import Y.Shared.Convo (Event)
 import Y.Client.WebSocket as Ws
 import Y.Client.Core (Model)
 
-type Action = Model -> ActionMonad Model
+type Action = Model -> Effect Model
 
 newtype ActionMonad a = ActionMonad (ReaderT ActionAnswer Effect a)
 

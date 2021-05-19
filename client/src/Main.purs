@@ -34,38 +34,13 @@ main :: Effect Unit
 main = do
 
   -- Initialize state
-  freshUserId /\ freshConvoId <- (/\) <$> newId <*> newId
-  userId /\ convoId <- initialize_f (/\) freshUserId freshConvoId
-  let initialModel = mkInitialModel userId convoId
-
-  -- Spin up websocket
-  hostname <- getHostname
-  (wsClient :: Ws.Client Transmission (List Event))
-    <- Ws.newConnection { url: "ws://" <> hostname <> ":" <> show Config.webSocketPort }
-
-  -- apply hacky workaround
-  workaround_redirectFocusFromBodyToRoot
+  let initialModel = mkInitialModel
 
   -- Start Elmish
-  let sub = mkSub wsClient
   runApp
     { initialModel: initialModel
-    , subscriptions: const sub
+    , subscriptions: const mempty
     , view: view
-    , interpret: runActionMonad { wsClient }
+    , interpret: identity
     }
 
-  -- Kick the thing off!
-  wsClient # Ws.onOpen do
-    Console.log "WebSocket opened"
-    wsClient # Ws.transmit (Transmission_Subscribe { convoId })
-    wsClient # Ws.transmit (Transmission_Pull { convoId })
-
-  where
-    mkSub :: forall ts. Ws.Client ts (List Event) -> Sub Action
-    mkSub = websocketClientToElmishSubscription >>> map maybeEventsToAction
-
-    maybeEventsToAction :: Maybe (List Event) -> Action
-    maybeEventsToAction = case _ of
-      Nothing -> \model -> model <$ liftEffect (Console.warn "Events list failed to parse; doing nothing")
-      Just events -> \model -> pure $ model { convo = model.convo { events = model.convo.events <> events } }
