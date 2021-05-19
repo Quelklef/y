@@ -6,11 +6,8 @@ import Effect (Effect)
 import Effect.Uncurried (runEffectFn1)
 import Data.List (List)
 import Data.List as List
-import Data.Maybe (Maybe, fromJust)
 import Data.Set (Set)
 import Data.Set as Set
-
-import Partial.Unsafe (unsafePartial)
 
 import Platform as Platform
 import Html (Html)
@@ -18,7 +15,9 @@ import Html as H
 import Attribute as A
 import Css as S
 
-type Action = Model -> Model
+type Msg = Model -> Model
+
+type Model = Set Message
 
 type Message =
   { id :: String
@@ -26,38 +25,26 @@ type Message =
   , isDraft :: Boolean
   }
 
-type Model =
-  { messages :: Set Message
-  }
-
-mkInitialModel :: Model
-mkInitialModel =
-  { messages: Set.fromFoldable
-    [ { id: "y-message-testing-1"
-      , content: "I am message #1"
-      , isDraft: false
-      }
-    , { id: "y-message-testing-2"
-      , content: ""
-      , isDraft: true
-      }
-    ]
-  }
+initialModel :: Model
+initialModel = Set.fromFoldable
+  [ { id: "y-message-testing-1"
+    , content: "I am message #1"
+    , isDraft: false
+    }
+  , { id: "y-message-testing-2"
+    , content: ""
+    , isDraft: true
+    }
+  ]
 
 main :: Effect Unit
 main = do
-
-  -- Initialize state
-  let initialModel = mkInitialModel
-
-  -- Start Elmish
   let app = Platform.app
         { init: \_ -> pure initialModel
         , subscriptions: \_ -> mempty
         , update: \model msg -> pure (msg model)
         , view: view
         }
-
   (runEffectFn1 app) unit
 
 -- A card is a message or a draft plus computed info such as the shared fields
@@ -79,23 +66,20 @@ mkCard_Message m =
 
 --
 
-unsafeFromJust :: forall a. Maybe a -> a
-unsafeFromJust m = unsafePartial $ fromJust m
-
-view :: Model -> { head :: Array (Html Action), body :: Array (Html Action) }
+view :: Model -> { head :: Array (Html Msg), body :: Array (Html Msg) }
 view model = { head: [], body: [bodyView] }
   where
 
   cards :: List Card
-  cards = Set.toUnfoldable $ Set.map mkCard_Message model.messages
+  cards = Set.toUnfoldable $ Set.map mkCard_Message model
 
-  bodyView :: Html Action
+  bodyView :: Html Msg
   bodyView =
     H.div
     [ ]
     ( List.toUnfoldable $ cards # map viewCard )
 
-  viewCard :: Card -> Html Action
+  viewCard :: Card -> Html Msg
   viewCard card =
     H.divS
     [ S.width "300px"
@@ -118,9 +102,7 @@ view model = { head: [], body: [bodyView] }
       , S.outline "none !important"
       , S.width "100%"
       ]
-      [ case card.original of
-          draft ->
-            A.onInput \text m ->  m { messages = m.messages # Set.map (\d -> if d.id == draft.id then d { content = text } else d) }
+      [ A.onInput \text messages ->  messages # Set.map (\d -> if d.id == card.original.id then d { content = text } else d)
       ]
       [ H.text $ getContent card
       ]
