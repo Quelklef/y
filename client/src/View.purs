@@ -31,9 +31,9 @@ import Y.Client.Util.Vec2 as Vec2
 import Y.Client.Util.Opts (defOpts)
 import Y.Client.Util.OnKey (onKey, onKey'one, ShouldKeyBePressed(..), keyListenerToAttribute)
 import Y.Client.Core (Model, Draft)
-import Y.Client.Action (Action)
+import Y.Client.Action (Action(..))
 import Y.Client.Actions as Actions
-import Y.Client.Arrange (arrange)
+import Y.Client.Arrange as Arrange
 import Y.Client.CalcDims (calcDims)
 
 -- A card is a message or a draft plus computed info such as the shared fields
@@ -100,6 +100,9 @@ view model = { head: [], body: [bodyView] }
   isDraft card = case card.original of
     CardOriginal_Draft _ -> true
     CardOriginal_Message _ -> false
+
+  arrange = case Arrange.lookupAlgorithm model.arrangementAlgorithmKey of
+        Arrange.ArrangementAlgorithm algo -> algo
 
   positions =
     arrange
@@ -178,6 +181,8 @@ view model = { head: [], body: [bodyView] }
           cardHtmls = cards # map (\card -> card # viewCard (unsafeFromJust $ getPosition card.id))
 
         in List.toUnfoldable (cardHtmls <> arrowHtmls)
+
+    , viewArrangementAlgorithmPicker model.arrangementAlgorithmKey
     ]
 
   viewCard :: Vec2 -> Card -> Html Action
@@ -260,3 +265,25 @@ view model = { head: [], body: [bodyView] }
       ]
       [ ]
       [ ]
+
+  viewArrangementAlgorithmPicker :: String -> Html Action
+  viewArrangementAlgorithmPicker selection =
+    H.divS
+      [ S.position "absolute"
+      , S.top "1rem"
+      , S.right "1rem"
+      , S.fontFamily "sans-serif"
+      , S.fontSize "14px"
+      ]
+      [ ]
+      [ H.text "arrangement algorithm: "
+      , H.selectS
+          [ S.fontFamily "inherit"
+          ]
+          [ A.onInput \newSelection -> Action \m -> pure $ m { arrangementAlgorithmKey = newSelection } ]
+          ( Arrange.algorithms # Map.keys # Set.toUnfoldable # (["<default>"] <> _) # map \algoKey ->
+                H.option
+                [ if algoKey == selection then A.selected "selected" else mempty ]
+                [ H.text algoKey ]
+          )
+      ]

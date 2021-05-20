@@ -11,12 +11,15 @@ import Y.Shared.Util.Instant (Instant)
 import Y.Shared.Id (Id)
 import Y.Shared.Convo (Event, Convo)
 
+import Y.Client.Arrange (ArrangementAlgorithm)
+
 type Model =
   { userId :: Id "User"
   , convo :: Convo
   , drafts :: Set Draft
   , selectedIds :: Set (Id "Message")
   , focusedId :: Maybe (Id "Message")
+  , arrangementAlgorithmKey :: String
   }
 
 mkInitialModel :: Id "User" -> Id "Convo" -> Model
@@ -29,6 +32,7 @@ mkInitialModel userId convoId =
   , drafts: Set.empty
   , selectedIds: Set.empty
   , focusedId: Nothing
+  , arrangementAlgorithmKey: "<default>"
   }
 
 type Draft =
