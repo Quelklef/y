@@ -16,7 +16,13 @@ import Y.Shared.Convo (Event)
 import Y.Client.WebSocket as Ws
 import Y.Client.Core (Model)
 
-type Action = Model -> ActionMonad Model
+newtype Action = Action (Model -> ActionMonad Model)
+
+instance semigroupAction :: Semigroup Action where
+  append (Action a1) (Action a2) = Action (a1 >=> a2)
+
+instance monoidAction :: Monoid Action where
+  mempty = Action pure
 
 newtype ActionMonad a = ActionMonad (ReaderT ActionAnswer Effect a)
 
@@ -24,8 +30,9 @@ type ActionAnswer =
   { wsClient :: Ws.Client Transmission (List Event)
   }
 
-runActionMonad :: ActionAnswer -> ActionMonad ~> Effect
-runActionMonad answer (ActionMonad act) = runReaderT act answer
+runAction :: ActionAnswer -> Action -> (Model -> Effect Model)
+runAction answer (Action action) model =
+  case action model of ActionMonad mr -> runReaderT mr answer
 
 unActionMonad :: forall a. ActionMonad a -> ReaderT ActionAnswer Effect a
 unActionMonad (ActionMonad r) = r

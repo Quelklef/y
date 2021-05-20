@@ -16,14 +16,14 @@ import Y.Shared.Convo (EventPayload(..))
 import Y.Shared.Transmission (Transmission(..))
 
 import Y.Client.Core (Model, Draft)
-import Y.Client.Action (Action)
+import Y.Client.Action (Action(..))
 import Y.Client.WebSocket as Ws
 
 noop :: Action
-noop = pure
+noop = Action pure
 
 createDraft :: Action
-createDraft model = do
+createDraft = Action \model -> do
   (mid :: Id "Message") <- liftEffect newId
   now <- liftEffect getNow
 
@@ -70,11 +70,11 @@ foreign import setTimeout0 :: forall a. Effect a -> Effect Unit
 foreign import focusElementById :: String -> Effect Unit
 
 editDraft :: Id "Message" -> String -> Action
-editDraft draftId text model = do
+editDraft draftId text = Action \model -> do
   pure $ model { drafts = model.drafts # Set.map (\draft -> if draft.id == draftId then draft { content = text } else draft) }
 
 sendMessage :: Draft -> Action
-sendMessage draft model = do
+sendMessage draft = Action \model -> do
   now <- liftEffect getNow
 
   let convoId = model.convo.id

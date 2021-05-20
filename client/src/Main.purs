@@ -18,7 +18,7 @@ import Y.Shared.Config as Config
 
 import Y.Client.App (runApp)
 import Y.Client.Core (mkInitialModel)
-import Y.Client.Action (Action, runActionMonad)
+import Y.Client.Action (Action(..), runAction)
 import Y.Client.View (view)
 import Y.Client.WebSocket as Ws
 import Y.Client.WebSocketClientToElmishSubscription (websocketClientToElmishSubscription)
@@ -52,7 +52,7 @@ main = do
     { initialModel: initialModel
     , subscriptions: const sub
     , view: view
-    , interpret: runActionMonad { wsClient }
+    , interpret: runAction { wsClient }
     }
 
   -- Kick the thing off!
@@ -67,5 +67,5 @@ main = do
 
     maybeEventsToAction :: Maybe (List Event) -> Action
     maybeEventsToAction = case _ of
-      Nothing -> \model -> model <$ liftEffect (Console.warn "Events list failed to parse; doing nothing")
-      Just events -> \model -> pure $ model { convo = model.convo { events = model.convo.events <> events } }
+      Nothing -> Action \model -> model <$ liftEffect (Console.warn "Events list failed to parse; doing nothing")
+      Just events -> Action \model -> pure $ model { convo = model.convo { events = model.convo.events <> events } }

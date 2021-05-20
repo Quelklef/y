@@ -15,23 +15,21 @@ import Html (Html)
 -- This is true. However, we don't use a typical Elmlike architecture.
 -- This module encapsulates our custom architecture
 
-type Action model effect = model -> effect model
-
-runApp :: forall model effect.
+runApp :: forall model action.
           { initialModel :: model
-          , subscriptions :: model -> Sub (Action model effect)
+          , subscriptions :: model -> Sub action
           , view :: model ->
-                    { head :: Array (Html (Action model effect))
-                    , body :: Array (Html (Action model effect))
+                    { head :: Array (Html action)
+                    , body :: Array (Html action)
                     }
-          , interpret :: effect ~> Effect
+          , interpret :: action -> (model -> Effect model)
           }
           -> Effect Unit
 
 runApp args = do
   let elmish = Platform.app
         { init: \_ -> pure args.initialModel
-        , update: \model action -> lift (args.interpret (action model))
+        , update: \model action -> lift ((args.interpret action) model)
         , subscriptions: \model -> args.subscriptions model
         , view: \model -> args.view model
         } 

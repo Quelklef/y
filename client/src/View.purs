@@ -19,6 +19,7 @@ import Partial.Unsafe (unsafePartial)
 import Html (Html)
 import Html as H
 import Css as S
+import Attribute (Attribute)
 import Attribute as A
 import WHATWG.DOM.Event (target, currentTarget) as Wwg
 import WHATWG.HTML.KeyboardEvent (toMaybeKeyboardEvent, shiftKey, key) as Wwg
@@ -32,7 +33,7 @@ import Y.Client.Util.Vec2 as Vec2
 import Y.Client.Util.Is ((===))
 import Y.Client.Util.Opts (Opts)
 import Y.Client.Core (Model, Draft)
-import Y.Client.Action (Action)
+import Y.Client.Action (Action(..))
 import Y.Client.Actions as Actions
 import Y.Client.Arrange (arrange)
 import Y.Client.CalcDims (calcDims)
@@ -130,9 +131,9 @@ view model = { head: [], body: [bodyView] }
     [ A.tabindex "0"  -- required to pick up key presses
     , case focusedCard # map _.original of
         Just (CardOriginal_Draft draft) ->
-           onKey "Enter" (_ { shift = RequirePressed }) pure $ Actions.sendMessage draft
+           onKey "Enter" (_ { shift = RequirePressed }) $ Actions.sendMessage draft
         _ ->
-           onKey "Enter" (_ { shift = RequireNotPressed }) pure Actions.createDraft
+           onKey "Enter" (_ { shift = RequireNotPressed }) Actions.createDraft
     ]
     [ H.divS
       [ S.position "absolute"
@@ -179,7 +180,7 @@ view model = { head: [], body: [bodyView] }
     , S.fontFamily "sans-serif"
     , S.fontSize "13px"
     ]
-    [ A.onClick $ pure <<< (_ { focusedId = Just card.id }) ]
+    [ A.onClick (Action $ pure <<< _ { focusedId = Just card.id }) ]
     [ H.divS
       [ ]
       [ ]
@@ -200,7 +201,7 @@ view model = { head: [], body: [bodyView] }
               A.disabled "disabled"
 
             CardOriginal_Draft draft -> fold
-              [ onKey "Enter" (_ { shift = RequirePressed }) pure (Actions.sendMessage draft)
+              [ onKey "Enter" (_ { shift = RequirePressed }) $ Actions.sendMessage draft
               , A.onInput \text -> Actions.editDraft draft.id text
               ]
         ]
@@ -241,25 +242,24 @@ view model = { head: [], body: [bodyView] }
 
 data ShouldKeyBePressed = NoPreference | RequirePressed | RequireNotPressed
 
-onKey :: forall act.
+onKey :: forall action. Monoid action =>
          String ->
          Opts { self :: ShouldKeyBePressed, shift :: ShouldKeyBePressed } ->
-         act ->
-         act ->
-         A.Attribute act
+         action ->
+         Attribute action
 
-onKey key mkOpts actNoop actDoIt =
+onKey key mkOpts action =
   let opts = mkOpts { self: NoPreference, shift: NoPreference } in
   A.on "keydown" \event -> pure $
     case Wwg.toMaybeKeyboardEvent event of
-      Nothing -> actNoop
+      Nothing -> mempty
       Just keyEvent -> do
         let
           keyOk = Wwg.key keyEvent == key
           selfOk = pressedOk opts.self $ Wwg.target keyEvent === Wwg.currentTarget keyEvent
           shiftOk = pressedOk opts.shift $ Wwg.shiftKey keyEvent
           ok = keyOk && selfOk && shiftOk
-        if ok then actDoIt else actNoop
+        if ok then action else mempty
 
   where
     pressedOk shouldBePressed isPressed = case shouldBePressed of
