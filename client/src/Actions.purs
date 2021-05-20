@@ -22,6 +22,9 @@ import Y.Client.WebSocket as Ws
 noop :: Action
 noop = Action pure
 
+setFocused :: Id "Message" -> Action
+setFocused id = Action \model -> pure $ model { focusedId = Just id }
+
 createDraft :: Action
 createDraft = Action \model -> do
   (mid :: Id "Message") <- liftEffect newId

@@ -10,7 +10,7 @@ import Data.List (List)
 import Data.List as List
 import Data.Maybe (Maybe(..), fromJust, fromMaybe)
 import Data.Tuple.Nested ((/\))
-import Data.Foldable (fold, minimumBy)
+import Data.Foldable (fold, foldl, minimumBy)
 import Data.Newtype (unwrap)
 import Data.Generic.Rep (class Generic)
 import Control.Alt ((<|>))
@@ -31,9 +31,9 @@ import Y.Shared.Convo (Message, simulate)
 import Y.Client.Util.Vec2 (Vec2)
 import Y.Client.Util.Vec2 as Vec2
 import Y.Client.Util.Is ((===))
-import Y.Client.Util.Opts (Opts)
+import Y.Client.Util.Opts (Opts, defOpts)
 import Y.Client.Core (Model, Draft)
-import Y.Client.Action (Action(..))
+import Y.Client.Action (Action)
 import Y.Client.Actions as Actions
 import Y.Client.Arrange (arrange)
 import Y.Client.CalcDims (calcDims)
@@ -89,8 +89,8 @@ view model = { head: [], body: [bodyView] }
   cardsById :: Map (Id "Message") Card
   cardsById = cards # map (\card -> card.id /\ card) # Map.fromFoldable
 
-  focusedCard :: Maybe Card
-  focusedCard = model.focusedId >>= \id -> cardsById # Map.lookup id
+  maybeFocusedCard :: Maybe Card
+  maybeFocusedCard = model.focusedId >>= \id -> cardsById # Map.lookup id
 
   isFocused :: forall r. { id :: Id "Message" | r } -> Boolean
   isFocused { id } = model.focusedId == Just id
@@ -117,6 +117,11 @@ view model = { head: [], body: [bodyView] }
   getAuthorName :: Id "User" -> Maybe String
   getAuthorName id = convoState.userNames # Map.lookup id
 
+  getReplies :: Id "Message" -> Set Card
+  getReplies = \id -> Map.lookup id mapping # fromMaybe Set.empty
+    where mapping = cards >>= (\card -> card.depIds # Set.toUnfoldable # map \depId -> Map.singleton depId (Set.singleton card))
+                  # foldl (Map.unionWith Set.union) Map.empty
+
   bodyView :: Html Action
   bodyView =
     H.divS
@@ -129,11 +134,23 @@ view model = { head: [], body: [bodyView] }
     , S.outline "none"  -- was getting outlined on focus
     ]
     [ A.tabindex "0"  -- required to pick up key presses
-    , case focusedCard # map _.original of
+
+    , case maybeFocusedCard # map _.original of
         Just (CardOriginal_Draft draft) ->
            onKey "Enter" (_ { shift = RequirePressed }) $ Actions.sendMessage draft
         _ ->
            onKey "Enter" (_ { shift = RequireNotPressed }) Actions.createDraft
+
+    , case maybeFocusedCard of
+        Nothing -> mempty
+        Just focusedCard -> fold
+          [ onKey "ArrowUp" defOpts $ case Set.toUnfoldable focusedCard.depIds of
+              [id] -> Actions.setFocused id
+              _ -> Actions.noop
+          , onKey "ArrowDown" defOpts $ case Set.toUnfoldable (getReplies focusedCard.id) of
+              [reply] -> Actions.setFocused reply.id
+              _ -> Actions.noop
+          ]
     ]
     [ H.divS
       [ S.position "absolute"
@@ -142,7 +159,7 @@ view model = { head: [], body: [bodyView] }
       , S.top "50vh"
       , S.left "50vw"
       , let firstCard = cards # minimumBy (comparing _.time)
-            offset = (focusedCard <|> firstCard) # map _.id >>= getPosition # fromMaybe zero # negate
+            offset = (maybeFocusedCard <|> firstCard) # map _.id >>= getPosition # fromMaybe zero # negate
         in S.transform $ "translate(" <> show (Vec2.getX offset) <> "px" <> ", " <> show (Vec2.getY offset) <> "px" <> ")"
       , S.transition "transform 0.075s ease-in-out"  -- hell yes
       ]
@@ -180,7 +197,7 @@ view model = { head: [], body: [bodyView] }
     , S.fontFamily "sans-serif"
     , S.fontSize "13px"
     ]
-    [ A.onClick (Action $ pure <<< _ { focusedId = Just card.id }) ]
+    [ A.onClick $ Actions.setFocused card.id ]
     [ H.divS
       [ ]
       [ ]
