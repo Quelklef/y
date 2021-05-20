@@ -1,6 +1,6 @@
 const vals = {};
 
-exports.global =
+exports.global_f =
 key => mk =>
 {
   if (key in vals)

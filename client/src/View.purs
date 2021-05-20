@@ -18,6 +18,7 @@ import Data.Monoid (guard)
 import Data.String.CodeUnits (length) as String
 import Data.String.Common (split) as String
 import Data.String.Pattern (Pattern(..)) as String
+import Data.Lazy as Lazy
 import Control.Alt ((<|>))
 import Partial.Unsafe (unsafePartial)
 
@@ -111,9 +112,11 @@ view model = { head: [], body: [bodyView] }
   arrange = case Arrange.lookupAlgorithm model.arrangementAlgorithmKey of
         Arrange.ArrangementAlgorithm algo -> algo
 
-  -- extremely naughty
+  -- Extremely naughty
+  -- Uses the 'viewCard' closure from the *first* render in order to calculate
+  -- dimensions for that *and all subsequent* renders
   calcDims'cached :: Card -> { width :: Number, height :: Number }
-  calcDims'cached = global "QdyjNN4JModpDGXRLgZn" \_ ->
+  calcDims'cached = global "QdyjNN4JModpDGXRLgZn" $ Lazy.defer \_ ->
                     memoizeBy (\card -> isDraft card /\ card.id)
                               (calcDims <<< viewCard Vec2.origin)
 

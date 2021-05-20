@@ -27,5 +27,6 @@
   , "math"
   , "control"
   , "arrays"
+  , "lazy"
   ] 
 }
