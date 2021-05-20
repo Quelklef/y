@@ -43,6 +43,7 @@ import Y.Client.Action (Action(..))
 import Y.Client.Actions as Actions
 import Y.Client.Arrange as Arrange
 import Y.Client.CalcDims (calcDims)
+import Y.Client.Attach ((&), (!), el)
 
 -- A card is a message or a draft plus computed info such as the shared fields
 -- The real solution here would be to use lenses
@@ -141,18 +142,18 @@ view model = { head: [], body: [bodyView] }
 
   bodyView :: Html Action
   bodyView =
-    H.divS
-    [ S.position "absolute"
-    , S.top "0"
-    , S.left "0"
-    , S.width "100vw"
-    , S.height "100vh"
-    , S.overflow "hidden"
-    , S.outline "none"  -- was getting outlined on focus
-    ]
-    [ A.tabindex "0"  -- required to pick up key presses
+    el "div"
+    & S.position "absolute"
+    & S.top "0"
+    & S.left "0"
+    & S.width "100vw"
+    & S.height "100vh"
+    & S.overflow "hidden"
+    & S.outline "none"  -- was getting outlined on focus
+    
+    & A.tabindex "0"  -- required to pick up key presses
 
-    , keyListenerToAttribute $ fold
+    & (keyListenerToAttribute <<< fold)
         [ case maybeFocusedCard # map _.original of
             Just (CardOriginal_Draft draft) ->
                onKey "Enter" (_ { shift = RequirePressed }) $ Actions.sendMessage draft
@@ -175,20 +176,20 @@ view model = { head: [], body: [bodyView] }
                   ]
               ]
         ]
-    ]
-    [ H.divS
-      [ S.position "absolute"
-      , S.width "0"
-      , S.height "0"
-      , S.top "50vh"
-      , S.left "50vw"
-      , let firstCard = cards # minimumBy (comparing _.time)
-            offset = (maybeFocusedCard <|> firstCard) # map _.id >>= getPosition # fromMaybe zero # negate
-        in S.transform $ "translate(" <> show (Vec2.getX offset) <> "px" <> ", " <> show (Vec2.getY offset) <> "px" <> ")"
-      , S.transition "transform 0.075s ease-in-out"  -- hell yes
-      ]
-      [ ]
-      $ let
+
+    !
+    [ el "div"
+      & S.position "absolute"
+      & S.width "0"
+      & S.height "0"
+      & S.top "50vh"
+      & S.left "50vw"
+      & (let firstCard = cards # minimumBy (comparing _.time)
+             offset = (maybeFocusedCard <|> firstCard) # map _.id >>= getPosition # fromMaybe zero # negate
+         in S.transform $ "translate(" <> show (Vec2.getX offset) <> "px" <> ", " <> show (Vec2.getY offset) <> "px" <> ")")
+      & S.transition "transform 0.075s ease-in-out"  -- hell yes
+      !
+      ( let
           arrows = cards >>= \card -> card.depIds
                                     # Set.toUnfoldable
                                     # map \dep -> { from: unsafeFromJust $ getPosition dep
@@ -196,36 +197,36 @@ view model = { head: [], body: [bodyView] }
           arrowHtmls = arrows # map viewArrow
           cardHtmls = cards # map (\card -> card # viewCard (unsafeFromJust $ getPosition card.id))
 
-        in List.toUnfoldable (cardHtmls <> arrowHtmls)
+        in List.toUnfoldable (cardHtmls <> arrowHtmls) )
 
     , viewArrangementAlgorithmPicker model.arrangementAlgorithmKey
     ]
 
   viewCard :: Vec2 -> Card -> Html Action
   viewCard position card =
-    H.divS
-    [ S.position "absolute"
-    , S.zIndex $
+    el "div"
+    & S.position "absolute"
+    & (S.zIndex
         if isFocused card then "2"  -- above other cards
-        else "1"  -- above the arrows
-    , S.top $ (show (unwrap position).y) <> "px"
-    , S.left $ (show (unwrap position).x) <> "px"
-    , S.transform "translate(-50%, -50%)"  -- center the card
-    , S.display "inline-block"
-    , let borderColor = if isFocused card then "red" else if isSelected card then "blue" else "lightgrey"
-      in S.border $ "1px solid " <> borderColor
-    , S.padding ".8rem 1.2rem"
-    , S.borderRadius ".3em"
-    , S.boxShadow "0 2px 6px -4px rgb(0 0 0 / 50%)"
-    , S.background "white"
-    , S.fontFamily "sans-serif"
-    , S.fontSize "13px"
-    , S.minWidth "0ch"
-    , S.maxWidth "45ch"
-    , guard (not $ isDraft card) $
+        else "1")  -- above the arrows
+    & S.top (show (unwrap position).y <> "px")
+    & S.left (show (unwrap position).x <> "px")
+    & S.transform "translate(-50%, -50%)"  -- center the card
+    & S.display "inline-block"
+    & (let borderColor = if isFocused card then "red" else if isSelected card then "blue" else "lightgrey"
+       in S.border $ "1px solid " <> borderColor)
+    & S.padding ".8rem 1.2rem"
+    & S.borderRadius ".3em"
+    & S.boxShadow "0 2px 6px -4px rgb(0 0 0 / 50%)"
+    & S.background "white"
+    & S.fontFamily "sans-serif"
+    & S.fontSize "13px"
+    & S.minWidth "0ch"
+    & S.maxWidth "45ch"
+    & guard (not $ isDraft card) $
       S.width $ (_ <> "ch") (card.content # String.split (String.Pattern "\n") # map String.length # maximum # fromMaybe 0 # show)
-    ]
-    [ A.onClick $ Actions.setFocused card.id ]
+    & A.onClick $ Actions.setFocused card.id
+    !
     [ case card.original of
         CardOriginal_Draft _ -> mempty
         CardOriginal_Message message ->

@@ -28,5 +28,6 @@
   , "control"
   , "arrays"
   , "lazy"
+  , "type-equality"
   ] 
 }
