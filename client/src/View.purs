@@ -6,14 +6,19 @@ import Data.Map (Map)
 import Data.Map as Map
 import Data.Set (Set)
 import Data.Set as Set
+import Data.Int as Int
 import Data.List (List)
 import Data.List as List
 import Data.Array as Array
 import Data.Maybe (Maybe(..), fromJust, fromMaybe)
 import Data.Tuple.Nested ((/\))
-import Data.Foldable (fold, foldl, minimumBy, length)
+import Data.Foldable (fold, foldl, minimumBy, length, maximum)
 import Data.Newtype (unwrap)
 import Data.Generic.Rep (class Generic)
+import Data.Monoid (guard)
+import Data.String.CodeUnits (length) as String
+import Data.String.Common (split) as String
+import Data.String.Pattern (Pattern(..)) as String
 import Control.Alt ((<|>))
 import Partial.Unsafe (unsafePartial)
 
@@ -110,7 +115,16 @@ view model = { head: [], body: [bodyView] }
       { getDeps: _.depIds >>> Set.toUnfoldable }
       { getTime: _.time }
       --{ getDims: calcDims <<< viewCard Vec2.origin }
-      { getDims: \card -> { width: 300.0, height: 50.0 } }  -- calcDims doesn't work :(
+      -- calcDims isn't working :( we'll do an esimation instead
+      { getDims: \card ->
+          { width: 300.0
+          , height: card.content
+                    # String.split (String.Pattern "\n")
+                    # length
+                    # Int.toNumber
+                    # (_ * 15.0)
+                    # (_ + 41.0)
+          } }
       cards
 
   getPosition :: Id "Message" -> Maybe Vec2
@@ -196,8 +210,6 @@ view model = { head: [], body: [bodyView] }
     , S.top $ (show (unwrap position).y) <> "px"
     , S.left $ (show (unwrap position).x) <> "px"
     , S.transform "translate(-50%, -50%)"  -- center the card
-    , S.width "300px"
-    , S.height "50px"
     , S.display "inline-block"
     , let borderColor = if isFocused card then "red" else if isSelected card then "blue" else "lightgrey"
       in S.border $ "1px solid " <> borderColor
@@ -207,48 +219,49 @@ view model = { head: [], body: [bodyView] }
     , S.background "white"
     , S.fontFamily "sans-serif"
     , S.fontSize "13px"
+    , S.minWidth "0ch"
+    , S.maxWidth "45ch"
+    , guard (not $ isDraft card) $
+      S.width $ (_ <> "ch") (card.content # String.split (String.Pattern "\n") # map String.length # maximum # fromMaybe 0 # show)
     ]
     [ A.onClick $ Actions.setFocused card.id ]
-    [ H.divS
-      [ ]
-      [ ]
-      [ H.textareaS
-        [ S.padding "0"
-        , S.background "none"
-        , S.resize "none"
-        , S.fontFamily "inherit"
-        , S.fontSize "inherit"
-        , S.color "inherit"
-        , S.border $ if isDraft card then "1px solid lightgrey" else "none"
-        , S.outline "none !important"
-        , S.width "100%"
-        ]
-        [ A.id $ "textarea-for-" <> Id.format card.id  -- hack for being able to set focus on the textareas
-        , case card.original of
-            CardOriginal_Message _ ->
-              A.disabled "disabled"
-
-            CardOriginal_Draft draft -> fold
-              [ onKey'one "Enter" (_ { shift = RequirePressed }) $ Actions.sendMessage draft
-              , A.onInput \text -> Actions.editDraft draft.id text
-              ]
-        ]
-        [ H.text $ card.content
+    [ case card.original of
+        CardOriginal_Draft _ -> mempty
+        CardOriginal_Message message ->
+          H.divS
+          [ S.fontSize "0.75em"
+          , S.fontStyle "italic"
+          , S.opacity "0.5"
+          , S.marginBottom "0.5em"
+          ]
+          [ ]
+          [ H.text $ message.authorId # getAuthorName # fromMaybe "<anonymous>" ]
+    , (if isDraft card then H.textareaS else H.divS)
+      [ S.padding "0"
+      , S.margin "0"
+      , S.background "none"
+      , S.resize "none"
+      , S.whiteSpace "pre-line"
+      , S.wordBreak "break-word"
+      , S.fontFamily "inherit"
+      , S.fontSize "inherit"
+      , S.color "inherit"
+      , S.border $ if isDraft card then "1px solid lightgrey" else "none"
+      , S.outline "none !important"
+      , guard (isDraft card) $ fold
+        [ S.height "5em"
+        , S.minWidth "300px"
         ]
       ]
-    , H.divS
-      [ S.fontSize "0.75em"
-      , S.textAlign "right"
-      , S.fontStyle "italic"
-      , S.opacity "0.5"
+      [ A.id $ "textarea-for-" <> Id.format card.id  -- hack for being able to set focus on the textareas
+      , case card.original of
+          CardOriginal_Draft draft -> fold
+            [ onKey'one "Enter" (_ { shift = RequirePressed }) $ Actions.sendMessage draft
+            , A.onInput \text -> Actions.editDraft draft.id text
+            ]
+          _ -> mempty
       ]
-      [ ]
-      [ case card.original of
-          CardOriginal_Draft d ->
-            mempty
-          CardOriginal_Message m ->
-            H.text $ (Id.format card.id) <> " from " <> (m.authorId # getAuthorName # fromMaybe "<anonymous>")
-      ]
+      [ H.text $ card.content ]
     ]
 
   viewArrow :: forall msg. { from :: Vec2, to :: Vec2 } -> Html msg
