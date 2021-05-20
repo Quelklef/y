@@ -11,6 +11,7 @@ import Data.Tuple.Nested ((/\))
 import Y.Client.Util.Vec2 (Vec2)
 
 import Y.Client.ArrangementAlgorithms.Bad as Bad
+import Y.Client.ArrangementAlgorithms.TreelikeNaive as TreelikeNaive
 
 newtype ArrangementAlgorithm = ArrangementAlgorithm (
     forall node time id. Ord node => Ord time => Ord id =>
@@ -24,8 +25,9 @@ newtype ArrangementAlgorithm = ArrangementAlgorithm (
 algorithms :: Map String ArrangementAlgorithm
 algorithms = Map.fromFoldable
   [ "bad" /\ ArrangementAlgorithm Bad.arrange
+  , "treelike-naive" /\ ArrangementAlgorithm TreelikeNaive.arrange
   ]
 
 lookupAlgorithm :: String -> ArrangementAlgorithm
 lookupAlgorithm name = Map.lookup name algorithms # fromMaybe defaultAlgo
-  where defaultAlgo = ArrangementAlgorithm Bad.arrange
+  where defaultAlgo = ArrangementAlgorithm TreelikeNaive.arrange

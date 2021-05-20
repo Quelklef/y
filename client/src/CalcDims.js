@@ -26,6 +26,7 @@ el => () =>
 exports.getOnlyChildOfElement =
 el => () =>
 {
+  console.log(el);
   const err = `Expected exactly 1 child, not ${el.childElementCount}.`;
   if (el.childElementCount === 0) throw Error(err);
   if (el.childElementCount !== 1) console.warn(err);

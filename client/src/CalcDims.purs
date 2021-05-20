@@ -2,6 +2,8 @@ module Y.Client.CalcDims where
 
 import Prelude
 
+import Debug as Debug
+
 import Effect (Effect)
 import Effect.Unsafe (unsafePerformEffect)
 import Effect.Uncurried (runEffectFn1)

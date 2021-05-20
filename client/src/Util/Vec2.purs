@@ -20,6 +20,12 @@ instance semiringVec2 :: Semiring Vec2 where
 instance ringVec2 :: Ring Vec2 where
   sub (Vec2 a) (Vec2 b) = Vec2 { x: a.x - b.x, y: a.y - b.y }
 
+instance semigroupVec2 :: Semigroup Vec2 where
+  append = add
+
+instance monoidVec2 :: Monoid Vec2 where
+  mempty = zero
+
 origin :: Vec2
 origin = Vec2 { x: 0.0, y: 0.0 }
 
@@ -34,3 +40,6 @@ mag (Vec2 v) = Math.sqrt(Math.pow v.x 2.0 + Math.pow v.y 2.0)
 
 angle :: Vec2 ->  Number
 angle (Vec2 v) = Math.atan2 v.y v.x
+
+scale :: Number -> Vec2 -> Vec2
+scale c (Vec2 v) = Vec2 { x: c * v.x, y: c * v.y }

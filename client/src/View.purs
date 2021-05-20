@@ -109,7 +109,8 @@ view model = { head: [], body: [bodyView] }
       { getId: _.id }
       { getDeps: _.depIds >>> Set.toUnfoldable }
       { getTime: _.time }
-      { getDims: calcDims <<< viewCard Vec2.origin }
+      --{ getDims: calcDims <<< viewCard Vec2.origin }
+      { getDims: \card -> { width: 300.0, height: 35.0 } }  -- calcDims doesn't work :(
       cards
 
   getPosition :: Id "Message" -> Maybe Vec2
@@ -196,7 +197,7 @@ view model = { head: [], body: [bodyView] }
     , S.left $ (show (unwrap position).x) <> "px"
     , S.transform "translate(-50%, -50%)"  -- center the card
     , S.width "300px"
-    , S.height "auto"
+    , S.height "35px"
     , S.display "inline-block"
     , let borderColor = if isFocused card then "red" else if isSelected card then "blue" else "lightgrey"
       in S.border $ "1px solid " <> borderColor
