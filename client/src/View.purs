@@ -19,10 +19,7 @@ import Partial.Unsafe (unsafePartial)
 import Html (Html)
 import Html as H
 import Css as S
-import Attribute (Attribute)
 import Attribute as A
-import WHATWG.DOM.Event (target, currentTarget) as Wwg
-import WHATWG.HTML.KeyboardEvent (toMaybeKeyboardEvent, shiftKey, key) as Wwg
 
 import Y.Shared.Util.Instant (Instant)
 import Y.Shared.Id (Id)
@@ -30,8 +27,8 @@ import Y.Shared.Convo (Message, simulate)
 
 import Y.Client.Util.Vec2 (Vec2)
 import Y.Client.Util.Vec2 as Vec2
-import Y.Client.Util.Is ((===))
-import Y.Client.Util.Opts (Opts, defOpts)
+import Y.Client.Util.Opts (defOpts)
+import Y.Client.Util.OnKey (onKey, onKey'one, ShouldKeyBePressed(..), keyListenerToAttribute)
 import Y.Client.Core (Model, Draft)
 import Y.Client.Action (Action)
 import Y.Client.Actions as Actions
@@ -135,22 +132,23 @@ view model = { head: [], body: [bodyView] }
     ]
     [ A.tabindex "0"  -- required to pick up key presses
 
-    , case maybeFocusedCard # map _.original of
-        Just (CardOriginal_Draft draft) ->
-           onKey "Enter" (_ { shift = RequirePressed }) $ Actions.sendMessage draft
-        _ ->
-           onKey "Enter" (_ { shift = RequireNotPressed }) Actions.createDraft
-
-    , case maybeFocusedCard of
-        Nothing -> mempty
-        Just focusedCard -> fold
-          [ onKey "ArrowUp" defOpts $ case Set.toUnfoldable focusedCard.depIds of
-              [id] -> Actions.setFocused id
-              _ -> Actions.noop
-          , onKey "ArrowDown" defOpts $ case Set.toUnfoldable (getReplies focusedCard.id) of
-              [reply] -> Actions.setFocused reply.id
-              _ -> Actions.noop
-          ]
+    , keyListenerToAttribute $ fold
+        [ case maybeFocusedCard # map _.original of
+            Just (CardOriginal_Draft draft) ->
+               onKey "Enter" (_ { shift = RequirePressed }) $ Actions.sendMessage draft
+            _ ->
+               onKey "Enter" (_ { shift = RequireNotPressed }) Actions.createDraft
+        , case maybeFocusedCard of
+            Nothing -> mempty
+            Just focusedCard -> fold
+              [ onKey "ArrowUp" defOpts $ case Set.toUnfoldable focusedCard.depIds of
+                  [id] -> Actions.setFocused id
+                  _ -> Actions.noop
+              , onKey "ArrowDown" defOpts $ case Set.toUnfoldable (getReplies focusedCard.id) of
+                  [reply] -> Actions.setFocused reply.id
+                  _ -> Actions.noop
+              ]
+        ]
     ]
     [ H.divS
       [ S.position "absolute"
@@ -218,7 +216,7 @@ view model = { head: [], body: [bodyView] }
               A.disabled "disabled"
 
             CardOriginal_Draft draft -> fold
-              [ onKey "Enter" (_ { shift = RequirePressed }) $ Actions.sendMessage draft
+              [ onKey'one "Enter" (_ { shift = RequirePressed }) $ Actions.sendMessage draft
               , A.onInput \text -> Actions.editDraft draft.id text
               ]
         ]
@@ -255,31 +253,3 @@ view model = { head: [], body: [bodyView] }
       ]
       [ ]
       [ ]
-
-
-data ShouldKeyBePressed = NoPreference | RequirePressed | RequireNotPressed
-
-onKey :: forall action. Monoid action =>
-         String ->
-         Opts { self :: ShouldKeyBePressed, shift :: ShouldKeyBePressed } ->
-         action ->
-         Attribute action
-
-onKey key mkOpts action =
-  let opts = mkOpts { self: NoPreference, shift: NoPreference } in
-  A.on "keydown" \event -> pure $
-    case Wwg.toMaybeKeyboardEvent event of
-      Nothing -> mempty
-      Just keyEvent -> do
-        let
-          keyOk = Wwg.key keyEvent == key
-          selfOk = pressedOk opts.self $ Wwg.target keyEvent === Wwg.currentTarget keyEvent
-          shiftOk = pressedOk opts.shift $ Wwg.shiftKey keyEvent
-          ok = keyOk && selfOk && shiftOk
-        if ok then action else mempty
-
-  where
-    pressedOk shouldBePressed isPressed = case shouldBePressed of
-      NoPreference -> true
-      RequirePressed -> isPressed == true
-      RequireNotPressed -> isPressed == false
