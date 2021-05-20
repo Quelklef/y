@@ -17,9 +17,9 @@ import Data.List as List
 import Data.Set as Set
 import Data.Traversable (for_)
 import Partial.Unsafe (unsafePartial)
-import Data.Newtype (unwrap)
 
-import Y.Shared.Id (Id, newId)
+import Y.Shared.Id (Id)
+import Y.Shared.Id as Id
 import Y.Shared.Convo (Convo, Event)
 import Y.Shared.Transmission (Transmission(..))
 import Y.Shared.Config as Config
@@ -72,10 +72,10 @@ main = do
 
   server # Ws.onConnection \client -> do
 
-    clientId <- newId
+    clientId <- Id.new
     clientsRef # Ref.modify_ (Map.insert clientId client)
 
-    Console.log $ "New WebSocket connection: " <> unwrap clientId
+    Console.log $ "New WebSocket connection: " <> Id.format clientId
 
     client # Ws.onTransmission case _ of
       Left err -> Console.warn $ "Warning: transmission failed to decode; details:\n" <> err
@@ -101,4 +101,4 @@ main = do
 
     client # Ws.onClose do
       subsRef # Ref.modify_ (Relation.lexp clientId)
-      Console.log $ "End WebSocket connection: " <> unwrap clientId
+      Console.log $ "End WebSocket connection: " <> Id.format clientId

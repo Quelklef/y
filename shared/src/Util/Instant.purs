@@ -3,8 +3,6 @@ module Y.Shared.Util.Instant where
 import Prelude
 
 import Effect (Effect)
-import Data.Ord (class Ord)
-import Data.Eq (class Eq)
 import Data.Generic.Rep (class Generic)
 import Data.Argonaut.Encode (class EncodeJson) as Agt
 import Data.Argonaut.Decode (class DecodeJson) as Agt

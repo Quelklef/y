@@ -15,6 +15,7 @@ import Data.Argonaut.Parser (jsonParser)
 class Encodable a where
   encode :: a -> String
 
+class Decodable :: forall k. (k -> Type) -> k -> Constraint
 class Decodable m a where
   decode :: String -> m a
 

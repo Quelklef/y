@@ -5,13 +5,13 @@ import Prelude
 import Data.Set (Set)
 import Data.Set as Set
 import Data.Maybe (Maybe(..), fromMaybe)
-import Data.Newtype (unwrap)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import Control.Monad.Reader.Class (ask)
 
 import Y.Shared.Util.Instant (getNow)
-import Y.Shared.Id (Id, newId)
+import Y.Shared.Id (Id)
+import Y.Shared.Id as Id
 import Y.Shared.Convo (EventPayload(..))
 import Y.Shared.Transmission (Transmission(..))
 
@@ -27,7 +27,7 @@ setFocused id = Action \model -> pure $ model { focusedId = Just id }
 
 createDraft :: Action
 createDraft = Action \model -> do
-  (mid :: Id "Message") <- liftEffect newId
+  (mid :: Id "Message") <- liftEffect Id.new
   now <- liftEffect getNow
 
   let (draft :: Draft) =
@@ -65,7 +65,7 @@ focusDraftTextareaAfterRender draftId = do
   --    complaint from the compiler, all despite consisting of a single conceptual unit.
   --    Yuck.
   -- This function should be reimplemented.
-  let textareaId = "textarea-for-" <> (unwrap draftId)
+  let textareaId = "textarea-for-" <> (Id.format draftId)
   setTimeout0 do
     focusElementById textareaId
 
@@ -91,7 +91,7 @@ sendMessage draft = Action \model -> do
         , content: draft.content
         }
 
-  eventId <- liftEffect newId
+  eventId <- liftEffect Id.new
   let event = { id: eventId, time: now, payload: EventPayload_MessageSend { convoId, message } }
   let transmission = Transmission_Push { convoId, event }
   wsClient <- _.wsClient <$> ask

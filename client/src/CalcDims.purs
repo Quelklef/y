@@ -2,8 +2,6 @@ module Y.Client.CalcDims where
 
 import Prelude
 
-import Debug as Debug
-
 import Effect (Effect)
 import Effect.Unsafe (unsafePerformEffect)
 import Effect.Uncurried (runEffectFn1)
@@ -11,8 +9,6 @@ import Effect.Uncurried (runEffectFn1)
 import Html (Html)
 import Platform as Platform
 import WHATWG.HTML.All (Element)
-
-import Y.Client.Util.Memoize (memoize)
 
 -- | An extremely naughty function which magically computes a node's rendered dimensions size
 calcDims :: forall msg. Html msg -> { width :: Number, height :: Number }

@@ -3,8 +3,6 @@ module Y.Client.Util.Vec2 where
 import Prelude
 
 import Data.Newtype (class Newtype, unwrap)
-import Data.Semiring (class Semiring)
-import Data.Ring (class Ring)
 import Math as Math
 
 newtype Vec2 = Vec2 { x :: Number, y :: Number }

@@ -24,6 +24,7 @@ import Attribute as A
 
 import Y.Shared.Util.Instant (Instant)
 import Y.Shared.Id (Id)
+import Y.Shared.Id as Id
 import Y.Shared.Convo (Message, simulate)
 
 import Y.Client.Util.Vec2 (Vec2)
@@ -34,7 +35,6 @@ import Y.Client.Core (Model, Draft)
 import Y.Client.Action (Action(..))
 import Y.Client.Actions as Actions
 import Y.Client.Arrange as Arrange
-import Y.Client.CalcDims (calcDims)
 
 -- A card is a message or a draft plus computed info such as the shared fields
 -- The real solution here would be to use lenses
@@ -110,7 +110,7 @@ view model = { head: [], body: [bodyView] }
       { getDeps: _.depIds >>> Set.toUnfoldable }
       { getTime: _.time }
       --{ getDims: calcDims <<< viewCard Vec2.origin }
-      { getDims: \card -> { width: 300.0, height: 35.0 } }  -- calcDims doesn't work :(
+      { getDims: \card -> { width: 300.0, height: 50.0 } }  -- calcDims doesn't work :(
       cards
 
   getPosition :: Id "Message" -> Maybe Vec2
@@ -197,7 +197,7 @@ view model = { head: [], body: [bodyView] }
     , S.left $ (show (unwrap position).x) <> "px"
     , S.transform "translate(-50%, -50%)"  -- center the card
     , S.width "300px"
-    , S.height "35px"
+    , S.height "50px"
     , S.display "inline-block"
     , let borderColor = if isFocused card then "red" else if isSelected card then "blue" else "lightgrey"
       in S.border $ "1px solid " <> borderColor
@@ -223,7 +223,7 @@ view model = { head: [], body: [bodyView] }
         , S.outline "none !important"
         , S.width "100%"
         ]
-        [ A.id $ "textarea-for-" <> unwrap card.id  -- hack for being able to set focus on the textareas
+        [ A.id $ "textarea-for-" <> Id.format card.id  -- hack for being able to set focus on the textareas
         , case card.original of
             CardOriginal_Message _ ->
               A.disabled "disabled"
@@ -247,7 +247,7 @@ view model = { head: [], body: [bodyView] }
           CardOriginal_Draft d ->
             mempty
           CardOriginal_Message m ->
-            H.text $ (unwrap card.id) <> " from " <> (m.authorId # getAuthorName # fromMaybe "<anonymous>")
+            H.text $ (Id.format card.id) <> " from " <> (m.authorId # getAuthorName # fromMaybe "<anonymous>")
       ]
     ]
 

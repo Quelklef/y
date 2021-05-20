@@ -1,7 +1,5 @@
 module Y.Client.Core where
 
-import Prelude
-
 import Data.Set (Set)
 import Data.Set as Set
 import Data.Maybe (Maybe(..))
@@ -9,9 +7,7 @@ import Data.List as List
 
 import Y.Shared.Util.Instant (Instant)
 import Y.Shared.Id (Id)
-import Y.Shared.Convo (Event, Convo)
-
-import Y.Client.Arrange (ArrangementAlgorithm)
+import Y.Shared.Convo (Convo)
 
 type Model =
   { userId :: Id "User"

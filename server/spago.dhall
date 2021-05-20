@@ -8,7 +8,6 @@
   , "ordered-collections"
   , "lists"
   , "maybe"
-  , "newtype"
   , "node-fs"
   , "stringutils"
   , "refs"

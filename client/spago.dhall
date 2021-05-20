@@ -26,5 +26,6 @@
   , "integers"
   , "math"
   , "control"
+  , "arrays"
   ] 
 }

@@ -1,10 +1,9 @@
-module Y.Shared.Id (Id, newId, parseId, isId) where
+module Y.Shared.Id (Id, new, format, parse, isId) where
 
 import Prelude
 
 import Effect (Effect)
 
-import Data.Newtype (class Newtype, unwrap)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Symbol (class IsSymbol, reflectSymbol, SProxy(..))
 import Data.String.Common (toLower)
@@ -14,32 +13,31 @@ import Data.Argonaut.Decode (class DecodeJson, decodeJson) as Agt
 
 newtype Id (for :: Symbol) = Id String
 
-derive instance newtypeId :: Newtype (Id for) _
 derive instance eqId :: Eq (Id for)
 derive instance ordId :: Ord (Id for)
 
-instance encodeJsonId :: Agt.EncodeJson (Id for) where encodeJson = unwrap >>> Agt.encodeJson
+instance encodeJsonId :: Agt.EncodeJson (Id for) where encodeJson = format >>> Agt.encodeJson
 instance decodeJsonId :: Agt.DecodeJson (Id for) where decodeJson = Agt.decodeJson >>> map Id
-
-instance showId :: Show (Id for) where
-  show = unwrap >>> show
 
 _tagName :: forall for. IsSymbol for => SProxy for -> String
 _tagName proxy = reflectSymbol proxy # toLower
 
-newId :: forall for. IsSymbol for => Effect (Id for)
-newId = newId_f (_tagName (SProxy :: SProxy for))
+new :: forall for. IsSymbol for => Effect (Id for)
+new = new_f (_tagName (SProxy :: SProxy for))
 
-foreign import newId_f :: forall for. String -> Effect (Id for)
+foreign import new_f :: forall for. String -> Effect (Id for)
+
+format :: forall for. Id for -> String
+format (Id s) = s
 
 -- | Parse an identifier
-parseId :: forall for. IsSymbol for => String -> Maybe (Id for)
-parseId id = parseId_f Nothing Just (_tagName (SProxy :: SProxy for)) id
+parse :: forall for. IsSymbol for => String -> Maybe (Id for)
+parse id = parse_f Nothing Just (_tagName (SProxy :: SProxy for)) id
 
-foreign import parseId_f :: forall for.
+foreign import parse_f :: forall for.
   (forall a. Maybe a) -> (forall a. a -> Maybe a) ->
   String -> String -> Maybe (Id for)
 
--- | @isId s@ is the same as @isJust (parseId s)@
+-- | @isId s@ is the same as @isJust (parse s)@
 isId :: forall for. IsSymbol for => String -> Boolean
-isId = map isJust (parseId :: String -> Maybe (Id for))
+isId = map isJust (parse :: String -> Maybe (Id for))

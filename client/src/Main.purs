@@ -11,7 +11,8 @@ import Effect.Class (liftEffect)
 
 import Sub (Sub)
 
-import Y.Shared.Id (Id, newId)
+import Y.Shared.Id (Id)
+import Y.Shared.Id as Id
 import Y.Shared.Convo (Event)
 import Y.Shared.Transmission (Transmission(..))
 import Y.Shared.Config as Config
@@ -34,7 +35,7 @@ main :: Effect Unit
 main = do
 
   -- Initialize state
-  freshUserId /\ freshConvoId <- (/\) <$> newId <*> newId
+  freshUserId /\ freshConvoId <- (/\) <$> Id.new <*> Id.new
   userId /\ convoId <- initialize_f (/\) freshUserId freshConvoId
   let initialModel = mkInitialModel userId convoId
 

@@ -3,9 +3,8 @@ module Y.Client.Action where
 import Prelude
 
 import Effect (Effect)
-import Effect.Class (class MonadEffect, liftEffect)
+import Effect.Class (class MonadEffect)
 import Data.List (List)
-import Control.Monad (class Monad, (>>=))
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Reader.Trans (ReaderT, runReaderT)
 import Control.Monad.Reader.Class (class MonadAsk, ask)

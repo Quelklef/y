@@ -4,7 +4,6 @@ import Prelude
 
 import Effect (Effect)
 import Effect.Uncurried (runEffectFn1)
-import Data.Tuple.Nested (type (/\), (/\))
 import Control.Monad.Trans.Class (lift)
 
 import Platform as Platform
