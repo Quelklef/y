@@ -44,22 +44,16 @@ type Card =
   { original :: CardOriginal
   , id :: Id "Message"
   , depIds :: Set (Id "Message")
-  --, content :: String  -- temporarily elided due to a bug in Elmish
+  , content :: String
   , time :: Instant  -- time created (draft) or sent (message)
   }
-
--- Temporary replacement for _.content
-getContent :: Card -> String
-getContent card = case card.original of
-  CardOriginal_Draft d -> d.content
-  CardOriginal_Message m -> m.content
 
 mkCard_Message :: Message -> Card
 mkCard_Message m =
   { original: CardOriginal_Message m
   , id: m.id
   , depIds: m.depIds
-  --, content: m.content
+  , content: m.content
   , time: m.timeSent
   }
 
@@ -68,7 +62,7 @@ mkCard_Draft d =
   { original: CardOriginal_Draft d
   , id: d.id
   , depIds: d.depIds
-  --, content: d.content
+  , content: d.content
   , time: d.timeCreated
   }
 
@@ -88,7 +82,8 @@ view model = { head: [], body: [bodyView] }
   convoState = simulate model.convo.events
 
   cards :: List Card
-  cards = Set.toUnfoldable $ (<>) (Set.map mkCard_Message convoState.messages) (Set.map mkCard_Draft model.drafts)
+  cards = ( Set.toUnfoldable $ (<>) (Set.map mkCard_Message convoState.messages) (Set.map mkCard_Draft model.drafts) )
+        # List.sortBy (comparing _.id)  -- shouldn't be required; is a workaround for ursi/purescript-elmish issue #5
 
   cardsById :: Map (Id "Message") Card
   cardsById = cards # map (\card -> card.id /\ card) # Map.fromFoldable
@@ -209,7 +204,7 @@ view model = { head: [], body: [bodyView] }
               , A.onInput \text -> Actions.editDraft draft.id text
               ]
         ]
-        [ H.text $ getContent card
+        [ H.text $ card.content
         ]
       ]
     , H.divS
