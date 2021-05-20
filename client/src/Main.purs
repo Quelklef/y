@@ -4,26 +4,30 @@ import Prelude
 
 import Effect (Effect)
 import Effect.Uncurried (runEffectFn1)
-import Partial.Unsafe (unsafePartial)
+import Data.Maybe (Maybe(..))
+import Data.Foldable (fold, length, intercalate)
+import Data.Array (slice)
 
 import Platform as Platform
 import Html (Html)
 import Html as H
 import Css as S
 import Attribute as A
+import Attribute (Attribute)
+import WHATWG.HTML.KeyboardEvent (toMaybeKeyboardEvent, key) as Wwg
 
-type Id = Int
+type Model =
+  { directions :: Array String
+  , lastPressed :: String
+  }
 
-type Model = Array Box
-data Msg = Msg_SwapBoxesAndSetText Id String
-
-type Box = { id :: Id , text :: String }
+data Msg = Msg_Noop | Msg_RotateDirections | Msg_Set String
 
 initialModel :: Model
 initialModel =
-  [ { id: 1, text: "text A" }
-  , { id: 2, text: "text B" }
-  ]
+  { directions: ["Up", "Down", "Left", "Right"]
+  , lastPressed: "<none>"
+  }
 
 main :: Effect Unit
 main = do
@@ -36,28 +40,35 @@ main = do
   (runEffectFn1 app) unit
 
 update :: Model -> Msg -> Model
-update boxes (Msg_SwapBoxesAndSetText targetBoxId newText) =
-  boxes # map updateBox # swapOrder
-  where
-    updateBox box = if box.id == targetBoxId then box { text = newText } else box
-    swapOrder = unsafePartial $ \[a, b] -> [b, a]
+update model Msg_Noop = model
+update model Msg_RotateDirections =
+  model { directions =  slice 1 (length model.directions) model.directions <> slice 0 1 model.directions }
+update model (Msg_Set lastPressed) = model { lastPressed = lastPressed }
 
 view :: Model -> { head :: Array (Html Msg), body :: Array (Html Msg) }
-view boxes =
+view model =
   { head: []
   , body:
-      [ H.button [ A.onClick $ Msg_SwapBoxesAndSetText 1 "new text" ] [ H.text "swap boxes and set box #1 text to 'new text'" ] ]
-      <>
-      ( boxes # map \box ->
-          H.divS
-          [ S.backgroundColor $ if box.id == 1 then "rgba(200 0 0 / 20%)" else "rgba(0 200 0 / 20%)" ]
-          [ ]
-          [ H.p
-            [ ]
-            [ H.text $ "Box #" <> show box.id ]
-          , H.textarea
-            [ A.onInput \text -> Msg_SwapBoxesAndSetText box.id text ]
-            [ H.text $ box.text ]
-          ]
-      )
+    [ H.p [ ]
+      [ H.text $ "Order of event listeners is: " <> (model.directions # intercalate ", ")
+      , H.text " "
+      , H.button [ A.onClick Msg_RotateDirections ] [ H.text "rotate" ]
+      ]
+    , H.divS
+      [ S.backgroundColor "rgba(0 200 0 / 20%)" ]
+      [ A.tabindex "0" {- required to pick up keypresses -}
+      , fold $ model.directions # map \dir -> onKey ("Arrow" <> dir) (Msg_Set dir)
+      ]
+      [ H.text "Click here then press an arrow key" ]
+    , H.p [ ] [ H.text $ "The last arrow key pressed was: " <> model.lastPressed ]
+    ]
   }
+
+onKey :: String -> Msg -> Attribute Msg
+onKey key msg =
+  A.on "keydown" \event -> pure $
+    case Wwg.toMaybeKeyboardEvent event of
+      Nothing -> Msg_Noop
+      Just keyEvent -> do
+        let keyOk = Wwg.key keyEvent == key
+        if keyOk then msg else Msg_Noop
