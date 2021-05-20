@@ -6,7 +6,6 @@ import Data.Map (Map)
 import Data.Map as Map
 import Data.Set (Set)
 import Data.Set as Set
-import Data.Int as Int
 import Data.List (List)
 import Data.List as List
 import Data.Array as Array
@@ -35,11 +34,14 @@ import Y.Shared.Convo (Message, simulate)
 import Y.Client.Util.Vec2 (Vec2)
 import Y.Client.Util.Vec2 as Vec2
 import Y.Client.Util.Opts (defOpts)
+import Y.Client.Util.Memoize (memoizeBy)
+import Y.Client.Util.Global (global)
 import Y.Client.Util.OnKey (onKey, onKey'one, ShouldKeyBePressed(..), keyListenerToAttribute)
 import Y.Client.Core (Model, Draft)
 import Y.Client.Action (Action(..))
 import Y.Client.Actions as Actions
 import Y.Client.Arrange as Arrange
+import Y.Client.CalcDims (calcDims)
 
 -- A card is a message or a draft plus computed info such as the shared fields
 -- The real solution here would be to use lenses
@@ -109,22 +111,18 @@ view model = { head: [], body: [bodyView] }
   arrange = case Arrange.lookupAlgorithm model.arrangementAlgorithmKey of
         Arrange.ArrangementAlgorithm algo -> algo
 
+  -- extremely naughty
+  calcDims'cached :: Card -> { width :: Number, height :: Number }
+  calcDims'cached = global "QdyjNN4JModpDGXRLgZn" \_ ->
+                    memoizeBy (\card -> isDraft card /\ card.id)
+                              (calcDims <<< viewCard Vec2.origin)
+
   positions =
     arrange
       { getId: _.id }
       { getDeps: _.depIds >>> Set.toUnfoldable }
       { getTime: _.time }
-      --{ getDims: calcDims <<< viewCard Vec2.origin }
-      -- calcDims isn't working :( we'll do an esimation instead
-      { getDims: \card ->
-          { width: 300.0
-          , height: card.content
-                    # String.split (String.Pattern "\n")
-                    # length
-                    # Int.toNumber
-                    # (_ * 15.0)
-                    # (_ + 41.0)
-          } }
+      { getDims: calcDims'cached }
       cards
 
   getPosition :: Id "Message" -> Maybe Vec2
