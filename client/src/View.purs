@@ -8,9 +8,10 @@ import Data.Set (Set)
 import Data.Set as Set
 import Data.List (List)
 import Data.List as List
+import Data.Array as Array
 import Data.Maybe (Maybe(..), fromJust, fromMaybe)
 import Data.Tuple.Nested ((/\))
-import Data.Foldable (fold, foldl, minimumBy)
+import Data.Foldable (fold, foldl, minimumBy, length)
 import Data.Newtype (unwrap)
 import Data.Generic.Rep (class Generic)
 import Control.Alt ((<|>))
@@ -144,9 +145,15 @@ view model = { head: [], body: [bodyView] }
               [ onKey "ArrowUp" defOpts $ case Set.toUnfoldable focusedCard.depIds of
                   [id] -> Actions.setFocused id
                   _ -> Actions.noop
-              , onKey "ArrowDown" defOpts $ case Set.toUnfoldable (getReplies focusedCard.id) of
-                  [reply] -> Actions.setFocused reply.id
-                  _ -> Actions.noop
+
+              , let replies = Set.toUnfoldable (getReplies focusedCard.id) # Array.sortBy (comparing _.time)
+                    mkArrowListener direction maybeCard
+                      = onKey ("Arrow" <> direction) defOpts $ maybeCard # map (_.id >>> Actions.setFocused) # fromMaybe Actions.noop
+                in fold
+                  [ mkArrowListener "Left" $ replies Array.!! 0
+                  , mkArrowListener "Down" $ replies Array.!! (length replies / 2)
+                  , mkArrowListener "Right" $ replies Array.!! (length replies - 1)
+                  ]
               ]
         ]
     ]
