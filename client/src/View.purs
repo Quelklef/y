@@ -30,7 +30,7 @@ import Attribute as A
 import Y.Shared.Util.Instant (Instant)
 import Y.Shared.Id (Id)
 import Y.Shared.Id as Id
-import Y.Shared.Convo (Message, simulate)
+import Y.Shared.Convo (EventPayload(..), Message, simulate)
 
 import Y.Client.Util.Vec2 (Vec2)
 import Y.Client.Util.Vec2 as Vec2
@@ -43,6 +43,7 @@ import Y.Client.Action (Action(..))
 import Y.Client.Actions as Actions
 import Y.Client.Arrange as Arrange
 import Y.Client.CalcDims (calcDims)
+import Y.Client.Colors as Colors
 
 -- A card is a message or a draft plus computed info such as the shared fields
 -- The real solution here would be to use lenses
@@ -95,6 +96,11 @@ view model = { head: [], body: [bodyView] }
   cardsById :: Map (Id "Message") Card
   cardsById = cards # map (\card -> card.id /\ card) # Map.fromFoldable
 
+  getAuthorId :: Card -> Id "User"
+  getAuthorId card = case card.original of
+    CardOriginal_Message m -> m.authorId
+    CardOriginal_Draft _ -> model.userId
+
   maybeFocusedCard :: Maybe Card
   maybeFocusedCard = model.focusedId >>= \id -> cardsById # Map.lookup id
 
@@ -139,6 +145,18 @@ view model = { head: [], body: [bodyView] }
     where mapping = cards >>= (\card -> card.depIds # Set.toUnfoldable # map \depId -> Map.singleton depId (Set.singleton card))
                   # foldl (Map.unionWith Set.union) Map.empty
 
+  getUserColor :: Id "User" -> String
+  getUserColor id = List.findIndex (_ == id) userIdsChronologically # map (Colors.make seed) # fromMaybe "black"
+    where
+      seed = Id.format model.convo.id
+      userIdsChronologically = Map.keys userIdToFirstMessageTime
+                             # Set.toUnfoldable
+                             # List.sortBy (comparing $ flip Map.lookup userIdToFirstMessageTime)
+      userIdToFirstMessageTime = model.convo.events
+                               # map (\event -> case event.payload of
+                                   EventPayload_MessageSend pl -> Map.singleton pl.message.authorId event.time
+                                   EventPayload_SetName _ -> Map.empty)
+                               # foldl Map.union Map.empty  -- left-biased
   bodyView :: Html Action
   bodyView =
     H.divS
@@ -247,9 +265,21 @@ view model = { head: [], body: [bodyView] }
           , S.fontStyle "italic"
           , S.opacity "0.5"
           , S.marginBottom "0.5em"
+          , S.paddingTop "1px"
           ]
           [ ]
-          [ H.text $ message.authorId # getAuthorName ]
+          [ H.spanS
+            [ S.height "0.5em"
+            , S.width "0.5em"
+            , S.backgroundColor $ getUserColor (getAuthorId card)
+            , S.border "1px solid black"
+            , S.marginRight "0.5em"
+            , S.display "inline-block"
+            ]
+            [ ]
+            [ ]
+          , H.text $ message.authorId # getAuthorName
+          ]
     , (if isDraft card then H.textareaS else H.divS)
       [ S.padding "0"
       , S.margin "0"
