@@ -4,6 +4,7 @@ import Prelude
 
 import Data.Set (Set)
 import Data.Set as Set
+import Data.List as List
 import Data.Maybe (Maybe(..), fromMaybe)
 import Effect (Effect)
 import Effect.Class (liftEffect)
@@ -12,7 +13,7 @@ import Control.Monad.Reader.Class (ask)
 import Y.Shared.Util.Instant (getNow)
 import Y.Shared.Id (Id)
 import Y.Shared.Id as Id
-import Y.Shared.Convo (EventPayload(..))
+import Y.Shared.Convo (Event, EventPayload(..))
 import Y.Shared.Transmission (Transmission(..))
 
 import Y.Client.Core (Model, Draft)
@@ -21,6 +22,10 @@ import Y.Client.WebSocket as Ws
 
 noop :: Action
 noop = Action pure
+
+fromEvent :: Event -> Action
+fromEvent event = Action \model ->
+  pure $ model { convo = model.convo { events = model.convo.events <> List.singleton event } }
 
 setFocused :: Id "Message" -> Action
 setFocused id = Action \model -> pure $ model { focusedId = Just id }
@@ -98,3 +103,17 @@ sendMessage draft = Action \model -> do
   liftEffect $ wsClient # Ws.transmit transmission
 
   pure $ model { drafts = model.drafts # Set.filter (\d -> d.id /= draft.id) }
+
+setName :: String -> Action
+setName newName = Action \model -> do
+  let convoId = model.convo.id
+  let userId = model.userId
+
+  now <- liftEffect getNow
+  eventId <- liftEffect Id.new
+  let event = { id: eventId, time: now, payload: EventPayload_SetName { convoId, userId, name: newName } }
+  let transmission = Transmission_Push { convoId, event }
+  wsClient <- _.wsClient <$> ask
+  liftEffect $ wsClient # Ws.transmit transmission
+
+  pure $ model { nicknameInputValue = Nothing }

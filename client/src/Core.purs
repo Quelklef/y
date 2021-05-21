@@ -16,6 +16,7 @@ type Model =
   , selectedIds :: Set (Id "Message")
   , focusedId :: Maybe (Id "Message")
   , arrangementAlgorithmKey :: String
+  , nicknameInputValue :: Maybe String
   }
 
 mkInitialModel :: Id "User" -> Id "Convo" -> Model
@@ -29,6 +30,7 @@ mkInitialModel userId convoId =
   , selectedIds: Set.empty
   , focusedId: Nothing
   , arrangementAlgorithmKey: "<default>"
+  , nicknameInputValue: Nothing
   }
 
 type Draft =

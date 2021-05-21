@@ -67,8 +67,13 @@ type Message =
 
 applyEvent :: Event -> (ConvoState -> ConvoState)
 applyEvent event state = case event.payload of
-  EventPayload_SetName pl -> state { userNames = state.userNames `Map.union` Map.singleton pl.userId pl.name }
+  EventPayload_SetName pl -> state { userNames = state.userNames `unionR` Map.singleton pl.userId pl.name }
   EventPayload_MessageSend pl -> state { messages = state.messages <> Set.singleton pl.message }
+
+  where
+    -- | Right-biased union
+    unionR :: forall k v. Ord k => Map k v -> Map k v -> Map k v
+    unionR = flip Map.union
 
 simulate :: forall f. Foldable f => f Event -> ConvoState
 simulate = foldl (flip applyEvent) state0

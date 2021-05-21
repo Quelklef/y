@@ -9,9 +9,9 @@ import Data.Set as Set
 import Data.List (List)
 import Data.List as List
 import Data.Array as Array
-import Data.Maybe (Maybe(..), fromJust, fromMaybe)
+import Data.Maybe (Maybe(..), fromJust, fromMaybe, isNothing)
 import Data.Tuple.Nested ((/\))
-import Data.Foldable (fold, foldl, minimumBy, length, maximum)
+import Data.Foldable (fold, foldl, minimumBy, length, maximum, foldMap)
 import Data.Newtype (unwrap)
 import Data.Generic.Rep (class Generic)
 import Data.Monoid (guard)
@@ -131,8 +131,8 @@ view model = { head: [], body: [bodyView] }
   getPosition :: Id "Message" -> Maybe Vec2
   getPosition id = positions # Map.lookup id
 
-  getAuthorName :: Id "User" -> Maybe String
-  getAuthorName id = convoState.userNames # Map.lookup id
+  getAuthorName :: Id "User" -> String
+  getAuthorName id = convoState.userNames # Map.lookup id # fromMaybe "<anonymous>"
 
   getReplies :: Id "Message" -> Set Card
   getReplies = \id -> Map.lookup id mapping # fromMaybe Set.empty
@@ -198,7 +198,20 @@ view model = { head: [], body: [bodyView] }
 
         in List.toUnfoldable (cardHtmls <> arrowHtmls)
 
-    , viewArrangementAlgorithmPicker model.arrangementAlgorithmKey
+    , H.divS
+      [ S.position "absolute"
+      , S.top "1rem"
+      , S.right "1rem"
+      , S.fontFamily "sans-serif"
+      , S.fontSize "14px"
+      , S.textAlign "right"
+      , S.lineHeight "2rem"
+      ]
+      [ ]
+      [ H.div [ ] [ H.text $ "user id: " <> Id.format model.userId ]
+      , viewArrangementAlgorithmPicker model.arrangementAlgorithmKey
+      , viewNameChanger
+      ]
     ]
 
   viewCard :: Vec2 -> Card -> Html Action
@@ -236,7 +249,7 @@ view model = { head: [], body: [bodyView] }
           , S.marginBottom "0.5em"
           ]
           [ ]
-          [ H.text $ message.authorId # getAuthorName # fromMaybe "<anonymous>" ]
+          [ H.text $ message.authorId # getAuthorName ]
     , (if isDraft card then H.textareaS else H.divS)
       [ S.padding "0"
       , S.margin "0"
@@ -283,13 +296,7 @@ view model = { head: [], body: [bodyView] }
 
   viewArrangementAlgorithmPicker :: String -> Html Action
   viewArrangementAlgorithmPicker selection =
-    H.divS
-      [ S.position "absolute"
-      , S.top "1rem"
-      , S.right "1rem"
-      , S.fontFamily "sans-serif"
-      , S.fontSize "14px"
-      ]
+    H.div
       [ ]
       [ H.text "arrangement algorithm: "
       , H.selectS
@@ -301,4 +308,36 @@ view model = { head: [], body: [bodyView] }
                 [ if algoKey == selection then A.selected "selected" else mempty ]
                 [ H.text algoKey ]
           )
+      ]
+
+  viewNameChanger ::  Html Action
+  viewNameChanger =
+    H.div
+      [ ]
+      [ H.text "nickname: "
+      , H.inputS
+        [ S.width "15ch" ]
+        [ A.value $ model.nicknameInputValue # fromMaybe (getAuthorName model.userId)
+        , A.onInput \text -> Action \m -> pure $ m { nicknameInputValue = Just text }
+        ]
+      , H.text " "
+      -- v TODO: The existence of these buttons is unfortunate.
+      --         Ideally, the nickname <input> would react to changes by debouncing and then
+      --         invoking Actions.setName, i.e., invoking a debounced Actions.setName.
+      --         Unfortunately, an Action is required to be synchronous, meaning that it
+      --         cannot be debounced. ActionMonad will need to be upgraded before actions
+      --         can be debounced.
+      --         This is likely best resolved by wrapping it in some kind of ContT.
+      --         I have not done this yet because it is going to be difficult and because
+      --         this codebase is behind an Elmish version or two anyway.
+      , H.button
+        [ guard (isNothing model.nicknameInputValue) $ A.disabled "disabled"
+        , A.onClick $ foldMap Actions.setName model.nicknameInputValue ]
+        [ H.text "update" ]
+      , H.text " "
+      , H.button
+        [ guard (isNothing model.nicknameInputValue) $ A.disabled "disabled"
+        , A.onClick $ Action \m -> pure $ m { nicknameInputValue = Nothing }
+        ]
+        [ H.text "cancel" ]
       ]

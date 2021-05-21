@@ -7,6 +7,7 @@ import Effect.Console as Console
 import Data.List (List)
 import Data.Maybe (Maybe(..))
 import Data.Tuple.Nested ((/\))
+import Data.Foldable (fold)
 import Effect.Class (liftEffect)
 
 import Sub (Sub)
@@ -20,6 +21,7 @@ import Y.Shared.Config as Config
 import Y.Client.App (runApp)
 import Y.Client.Core (mkInitialModel)
 import Y.Client.Action (Action(..), runAction)
+import Y.Client.Actions as Actions
 import Y.Client.View (view)
 import Y.Client.WebSocket as Ws
 import Y.Client.WebSocketClientToElmishSubscription (websocketClientToElmishSubscription)
@@ -69,4 +71,4 @@ main = do
     maybeEventsToAction :: Maybe (List Event) -> Action
     maybeEventsToAction = case _ of
       Nothing -> Action \model -> model <$ liftEffect (Console.warn "Events list failed to parse; doing nothing")
-      Just events -> Action \model -> pure $ model { convo = model.convo { events = model.convo.events <> events } }
+      Just events -> events # map Actions.fromEvent # fold
