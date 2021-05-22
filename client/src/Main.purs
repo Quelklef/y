@@ -10,8 +10,6 @@ import Data.Tuple.Nested ((/\))
 import Data.Foldable (fold)
 import Effect.Class (liftEffect)
 
-import Sub (Sub)
-
 import Y.Shared.Id (Id)
 import Y.Shared.Id as Id
 import Y.Shared.Convo (Event)
@@ -24,7 +22,7 @@ import Y.Client.Action (Action(..), runAction)
 import Y.Client.Actions as Actions
 import Y.Client.View (view)
 import Y.Client.WebSocket as Ws
-import Y.Client.WebSocketClientToElmishSubscription (websocketClientToElmishSubscription)
+import Y.Client.ToSub (websocketClientToSub, MorallySub, morallySubToSub)
 
 foreign import initialize_f :: forall a b r.
   (Id a -> Id b -> r) ->
@@ -32,6 +30,7 @@ foreign import initialize_f :: forall a b r.
 
 foreign import getHostname :: Effect String
 foreign import workaround_redirectFocusFromBodyToRoot :: Effect Unit
+foreign import screenDimsMorallySub :: MorallySub { width :: Number, height :: Number }
 
 main :: Effect Unit
 main = do
@@ -46,14 +45,26 @@ main = do
   (wsClient :: Ws.Client Transmission (List Event))
     <- Ws.newConnection { url: "ws://" <> hostname <> ":" <> show Config.webSocketPort }
 
-  -- apply hacky workaround
+  -- apply hacky workaround regarding element focus
   workaround_redirectFocusFromBodyToRoot
 
+  -- set up subscriptions
+  let subs = fold
+        [ websocketClientToSub wsClient
+            # map case _ of
+                Nothing -> Action \model ->
+                  model <$ liftEffect (Console.warn "Events list failed to parse; doing nothing")
+                Just events -> events # map Actions.fromEvent # fold
+
+        , morallySubToSub screenDimsMorallySub
+            # map \dims -> Action \model ->
+                pure $ model { screenDims = dims }
+        ]
+
   -- Start Elmish
-  let sub = mkSub wsClient
   runApp
     { initialModel: initialModel
-    , subscriptions: const sub
+    , subscriptions: const subs
     , view: view
     , interpret: runAction { wsClient }
     }
@@ -63,12 +74,3 @@ main = do
     Console.log "WebSocket opened"
     wsClient # Ws.transmit (Transmission_Subscribe { convoId })
     wsClient # Ws.transmit (Transmission_Pull { convoId })
-
-  where
-    mkSub :: forall ts. Ws.Client ts (List Event) -> Sub Action
-    mkSub = websocketClientToElmishSubscription >>> map maybeEventsToAction
-
-    maybeEventsToAction :: Maybe (List Event) -> Action
-    maybeEventsToAction = case _ of
-      Nothing -> Action \model -> model <$ liftEffect (Console.warn "Events list failed to parse; doing nothing")
-      Just events -> events # map Actions.fromEvent # fold

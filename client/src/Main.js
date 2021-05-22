@@ -51,3 +51,25 @@ exports.workaround_redirectFocusFromBodyToRoot =
     document.body.addEventListener('focusout', () => setTimeout(redirect, 0));
   });
 }
+
+exports.screenDimsMorallySub =
+send =>
+() =>
+{
+  function notify() {
+    send({
+      width: window.innerWidth,
+      height: window.innerHeight,
+    })();
+  }
+
+  window.addEventListener('DOMContentLoaded', notify);
+  window.addEventListener('resize', notify);
+
+  function cancel() {
+    window.removeEventListener('DOMContentLoaded', notify);
+    window.removeEventListener('resize', notify);
+  }
+
+  return cancel;
+};

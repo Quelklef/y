@@ -135,8 +135,11 @@ view model = { head: headView, body: [bodyView] }
       , getTime: _.time
       , getDims: calcDims'cached
       , nodes: cards
+      , screenDims: model.screenDims
+      , focusedId: model.focusedId
       }
 
+  -- | Cards with no position are not displayed
   getPosition :: Id "Message" -> Maybe Vec2
   getPosition id = positions # Map.lookup id
 
@@ -251,12 +254,20 @@ view model = { head: headView, body: [bodyView] }
       [ A.addClass "pan-animation-workaround"
       ]
       $ let
-          arrows = cards >>= \card -> card.depIds
-                                    # Set.toUnfoldable
-                                    # map \dep -> { from: unsafeFromJust $ getPosition dep
-                                                  , to: unsafeFromJust $ getPosition card.id }
+          arrows = cards
+                 >>= (\card -> card.depIds
+                             # Set.toUnfoldable
+                             # map \depId -> do
+                                 cardPos <- getPosition card.id
+                                 depPos <- getPosition depId
+                                 pure $ { from: depPos, to: cardPos })
+                 # List.catMaybes
+
           arrowHtmls = arrows # map viewArrow
-          cardHtmls = cards # map (\card -> card # viewCard (unsafeFromJust $ getPosition card.id))
+
+          cardHtmls = cards
+                    # map (\card -> getPosition card.id # map \pos -> viewCard pos card)
+                    # List.catMaybes
 
         in List.toUnfoldable (cardHtmls <> arrowHtmls)
 
@@ -272,6 +283,7 @@ view model = { head: headView, body: [bodyView] }
       [ ]
       [ viewArrangementAlgorithmPicker model.arrangementAlgorithmKey
       , viewNameChanger
+      , H.text $ show model.screenDims.width <> "px"
       ]
     ]
 

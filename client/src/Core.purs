@@ -18,6 +18,7 @@ type Model =
   , focusedId :: Maybe (Id "Message")
   , arrangementAlgorithmKey :: String
   , nicknameInputValue :: Maybe String
+  , screenDims :: { width :: Number, height :: Number }
   }
 
 mkInitialModel :: Id "User" -> Id "Convo" -> Model
@@ -32,6 +33,7 @@ mkInitialModel userId convoId =
   , focusedId: Nothing
   , arrangementAlgorithmKey: Arrange.defaultAlgoKey
   , nicknameInputValue: Nothing
+  , screenDims: { width: 0.0, height: 0.0 }  -- will be set by a subscription
   }
 
 type Draft =

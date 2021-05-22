@@ -1,4 +1,8 @@
-module Y.Client.WebSocketClientToElmishSubscription (websocketClientToElmishSubscription) where
+module Y.Client.ToSub
+  ( MorallySub
+  , morallySubToSub
+  , websocketClientToSub
+  ) where
 
 import Prelude
 
@@ -13,11 +17,8 @@ import Y.Client.WebSocket (Client, onTransmission)
 
 -- | Turn a WebSocket @Client@ into an Elmish @Sub@
 -- | Note that the resulting @Sub@ is *not* cancellable
-websocketClientToElmishSubscription :: forall m ts tc. Decodable m tc => Client ts tc -> Sub (m tc)
-websocketClientToElmishSubscription =
-  websocketClientToMorallySub
-  >>> morallySubToForeignSub
-  >>> foreignSubToSub
+websocketClientToSub :: forall m ts tc. Decodable m tc => Client ts tc -> Sub (m tc)
+websocketClientToSub = websocketClientToMorallySub >>> morallySubToSub
 
 -- What a @Sub@ is, morally speaking
 -- Essentially, a sub gets passed an @update :: model -> Effect Unit@.
@@ -29,6 +30,9 @@ type MorallySub a = ((a -> Effect Unit) -> Effect (Canceler))
 websocketClientToMorallySub :: forall m ts tc. Decodable m tc => Client ts tc -> MorallySub (m tc)
 websocketClientToMorallySub client = \update -> (client # onTransmission update) $> canceler
   where (canceler :: Canceler) = pure unit
+
+morallySubToSub :: MorallySub ~> Sub
+morallySubToSub = morallySubToForeignSub >>> foreignSubToSub
 
 morallySubToForeignSub :: forall a. MorallySub a -> (EffectFn1 (EffectFn1 a Unit) Canceler)
 morallySubToForeignSub ms = mkEffectFn1 (\update -> ms (runEffectFn1 update))
