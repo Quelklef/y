@@ -168,6 +168,9 @@ view model = { head: headView, body: [bodyView] }
         -- rather that inline on the nodes, and then attach the nodes to the classes.
         -- TODO: re-inline this style once Elmish is patched.
         [ ".pan-animation-workaround { transition: transform 0.075s ease-in-out; }"
+
+        -- border box best sizing
+        , "* { box-sizing: border-box }"
         ]
       ]
     ]
@@ -233,7 +236,7 @@ view model = { head: headView, body: [bodyView] }
 
     , H.divS
       [ S.position "absolute"
-      , S.top "1rem"
+      , S.top ".5rem"
       , S.right "1rem"
       , S.fontFamily "sans-serif"
       , S.fontSize "14px"
@@ -241,8 +244,7 @@ view model = { head: headView, body: [bodyView] }
       , S.lineHeight "2rem"
       ]
       [ ]
-      [ H.div [ ] [ H.text $ "user id: " <> Id.format model.userId ]
-      , viewArrangementAlgorithmPicker model.arrangementAlgorithmKey
+      [ viewArrangementAlgorithmPicker model.arrangementAlgorithmKey
       , viewNameChanger
       ]
     ]
@@ -266,10 +268,11 @@ view model = { head: headView, body: [bodyView] }
     , S.background "white"
     , S.fontFamily "sans-serif"
     , S.fontSize "13px"
-    , S.minWidth "0ch"
-    , S.maxWidth "45ch"
-    , guard (not $ isDraft card) $
-      S.width $ (_ <> "ch") (card.content # String.split (String.Pattern "\n") # map String.length # maximum # fromMaybe 0 # show)
+    , S.minWidth "18ch"
+    , S.maxWidth "35ch"
+    , S.width $ if isDraft card
+      then "100vw"  -- i.e., max-width
+      else (_ <> "ch") (card.content # String.split (String.Pattern "\n") # map String.length # maximum # fromMaybe 0 # show)
     ]
     [ A.onClick $ Actions.setFocused card.id ]
     [ case card.original of
@@ -309,7 +312,7 @@ view model = { head: headView, body: [bodyView] }
       , S.outline "none !important"
       , guard (isDraft card) $ fold
         [ S.height "5em"
-        , S.minWidth "300px"
+        , S.width "100%"
         ]
       ]
       [ A.id $ "textarea-for-" <> Id.format card.id  -- hack for being able to set focus on the textareas
