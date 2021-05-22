@@ -82,15 +82,17 @@ average fs = let vs = List.fromFoldable fs
                       n = length vs
                   in Just $ Vec2 { x: sx / n, y: sy / n }
 
-arrange :: forall node time id. Ord node => Ord time => Ord id =>
-           { getId :: node -> id } ->
-           { getDeps :: node -> List id } ->
-           { getTime :: node -> time } ->
-           { getDims :: node -> { width :: Number, height :: Number } } ->
-           List node ->
-           Map id Vec2
+arrange :: forall node time id x. Ord node => Ord time => Ord id =>
+           { getId :: node -> id
+           , getDepIds :: node -> List id
+           , getTime :: node -> time
+           , getDims :: node -> { width :: Number, height :: Number }
+           , nodes :: List node
+           | x
+           }
+           -> Map id Vec2
 
-arrange { getId } { getDeps: getDepIds } { getTime } { getDims } allNodes =
+arrange { getId, getDepIds, getTime, getDims, nodes: allNodes } =
 
   allNodes # ( stage1'assign >>> stage2'resolve >>> stage3'adjust )
 

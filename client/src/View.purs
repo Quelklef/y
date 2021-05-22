@@ -2,8 +2,6 @@ module Y.Client.View (view) where
 
 import Prelude
 
-import Debug as Debug
-
 import Data.Map (Map)
 import Data.Map as Map
 import Data.Set (Set)
@@ -44,7 +42,8 @@ import Y.Client.Util.Global (global)
 import Y.Client.Core (Model, Draft)
 import Y.Client.Action (Action(..))
 import Y.Client.Actions as Actions
-import Y.Client.Arrange as Arrange
+import Y.Client.Arrange (algorithms) as Arrange
+import Y.Client.ArrangementAlgorithms.Types (ArrangementAlgorithm(..)) as Arrange
 import Y.Client.CalcDims (calcDims)
 import Y.Client.Colors as Colors
 
@@ -131,11 +130,12 @@ view model = { head: headView, body: [bodyView] }
 
   positions =
     arrange
-      { getId: _.id }
-      { getDeps: _.depIds >>> Set.toUnfoldable }
-      { getTime: _.time }
-      { getDims: calcDims'cached }
-      cards
+      { getId: _.id
+      , getDepIds: _.depIds >>> Set.toUnfoldable
+      , getTime: _.time
+      , getDims: calcDims'cached
+      , nodes: cards
+      }
 
   getPosition :: Id "Message" -> Maybe Vec2
   getPosition id = positions # Map.lookup id
