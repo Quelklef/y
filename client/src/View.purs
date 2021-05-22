@@ -16,7 +16,7 @@ import Data.Newtype (unwrap)
 import Data.Generic.Rep (class Generic)
 import Data.Monoid (guard)
 import Data.String.CodeUnits (length) as String
-import Data.String.Common (split) as String
+import Data.String.Common (trim, split) as String
 import Data.String.Pattern (Pattern(..)) as String
 import Data.Lazy as Lazy
 import Control.Alt ((<|>))
@@ -37,7 +37,7 @@ import Y.Client.Util.Vec2 as Vec2
 import Y.Client.Util.Opts (defOpts)
 import Y.Client.Util.Memoize (memoizeBy)
 import Y.Client.Util.Global (global)
-import Y.Client.Util.OnKey (onKey, onKey'one, ShouldKeyBePressed(..), keyListenerToAttribute)
+import Y.Client.Util.OnKey (onKey, ShouldKeyBePressed(..), keyListenerToAttribute)
 import Y.Client.Core (Model, Draft)
 import Y.Client.Action (Action(..))
 import Y.Client.Actions as Actions
@@ -191,7 +191,11 @@ view model = { head: headView, body: [bodyView] }
     , keyListenerToAttribute $ fold
         [ case maybeFocusedCard # map _.original of
             Just (CardOriginal_Draft draft) ->
-               onKey "Enter" (_ { shift = RequirePressed }) $ Actions.sendMessage draft
+               onKey "Enter" (_ { shift = RequirePressed }) $
+                        let trimmed = String.trim draft.content
+                        in if trimmed == ""
+                        then Actions.noop
+                        else Actions.sendMessage $ draft { content = trimmed }
             _ ->
                onKey "Enter" (_ { shift = RequireNotPressed }) Actions.createDraft
         , case maybeFocusedCard of
@@ -318,8 +322,7 @@ view model = { head: headView, body: [bodyView] }
       [ A.id $ "textarea-for-" <> Id.format card.id  -- hack for being able to set focus on the textareas
       , case card.original of
           CardOriginal_Draft draft -> fold
-            [ onKey'one "Enter" (_ { shift = RequirePressed }) $ Actions.sendMessage draft
-            , A.onInput \text -> Actions.editDraft draft.id text
+            [ A.onInput \text -> Actions.editDraft draft.id text
             ]
           _ -> mempty
       ]
