@@ -2,6 +2,8 @@ module Y.Client.View (view) where
 
 import Prelude
 
+import Debug as Debug
+
 import Data.Map (Map)
 import Data.Map as Map
 import Data.Set (Set)
@@ -10,6 +12,7 @@ import Data.List (List)
 import Data.List as List
 import Data.Array as Array
 import Data.Maybe (Maybe(..), fromJust, fromMaybe, isNothing)
+import Data.Int as Int
 import Data.Tuple.Nested ((/\))
 import Data.Foldable (fold, foldl, minimumBy, length, maximum, foldMap)
 import Data.Newtype (unwrap)
@@ -171,6 +174,17 @@ view model = { head: headView, body: [bodyView] }
 
         -- border box best sizing
         , "* { box-sizing: border-box }"
+
+        -- colorshift animation
+        , let granularity = 10
+              keyframes =
+                Array.range 0 granularity
+                # map (\n ->
+                  let t = Int.toNumber n / Int.toNumber granularity
+                  in show (t * 100.0) <> "% { background: hsl(" <> show (t * 360.0) <> " 80% 90%); }")
+                # fold
+          in "@keyframes colorshift-anim {" <> keyframes <> "}"
+        , ".colorshift { animation: colorshift-anim 15s; animation-iteration-count: infinite; }"
         ]
       ]
     ]
@@ -201,6 +215,10 @@ view model = { head: headView, body: [bodyView] }
                 case focusedCard.original of
                   CardOriginal_Message _ -> Actions.createDraft
                   _ -> Actions.noop
+
+              -- Select card on E
+              else if Wwg.key keyEvent == "e" then
+                Actions.setSelected focusedCard.id (not $ isSelected focusedCard)
 
               -- arrow key controls
               else if Wwg.key keyEvent == "ArrowUp" then
@@ -268,12 +286,11 @@ view model = { head: headView, body: [bodyView] }
     , S.left $ (show (unwrap position).x) <> "px"
     , S.transform "translate(-50%, -50%)"  -- center the card
     , S.display "inline-block"
-    , let borderColor = if isFocused card then "red" else if isSelected card then "blue" else "lightgrey"
-      in S.border $ "1px solid " <> borderColor
+    , S.border $ "1px solid " <> (if isFocused card then "red" else "lightgrey")
+    , S.background "white"
     , S.padding ".8rem 1.2rem"
     , S.borderRadius ".3em"
     , S.boxShadow "0 2px 6px -4px rgb(0 0 0 / 50%)"
-    , S.background "white"
     , S.fontFamily "sans-serif"
     , S.fontSize "13px"
     , S.minWidth "18ch"
@@ -281,8 +298,11 @@ view model = { head: headView, body: [bodyView] }
     , S.width $ if isDraft card
       then "100vw"  -- i.e., max-width
       else (_ <> "ch") (card.content # String.split (String.Pattern "\n") # map String.length # maximum # fromMaybe 0 # show)
+    , S.outline "none"
     ]
-    [ A.onClick $ Actions.setFocused card.id ]
+    [ guard (isSelected card) $ A.addClass "colorshift"
+    , A.onClick $ Actions.setFocused card.id
+    ]
     [ case card.original of
         CardOriginal_Draft _ -> mempty
         CardOriginal_Message message ->

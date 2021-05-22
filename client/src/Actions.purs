@@ -45,6 +45,10 @@ sendEvent event = Action \model -> do
 setFocused :: Id "Message" -> Action
 setFocused id = Action \model -> pure $ model { focusedId = Just id }
 
+setSelected :: Id "Message" -> Boolean -> Action
+setSelected id to = Action \model ->
+  pure $ model { selectedIds = (if to then Set.insert else Set.delete) id model.selectedIds }
+
 createDraft :: Action
 createDraft = Action \model -> do
   (mid :: Id "Message") <- liftEffect Id.new
