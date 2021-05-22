@@ -9,6 +9,9 @@ newtype Vec2 = Vec2 { x :: Number, y :: Number }
 
 derive instance newtypeVec2 :: Newtype Vec2 _
 
+derive instance eqVec2 :: Eq Vec2
+derive instance ordVec2 :: Ord Vec2
+
 instance semiringVec2 :: Semiring Vec2 where
   add (Vec2 a) (Vec2 b) = Vec2 { x: a.x + b.x, y: a.y + b.y }
   zero = Vec2 { x: 0.0, y: 0.0 }
@@ -34,7 +37,7 @@ getY :: Vec2 -> Number
 getY = unwrap >>> _.y
 
 mag :: Vec2 -> Number
-mag (Vec2 v) = Math.sqrt(Math.pow v.x 2.0 + Math.pow v.y 2.0)
+mag (Vec2 v) = Math.sqrt (Math.pow v.x 2.0 + Math.pow v.y 2.0)
 
 angle :: Vec2 ->  Number
 angle (Vec2 v) = Math.atan2 v.y v.x
