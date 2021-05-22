@@ -283,7 +283,6 @@ view model = { head: headView, body: [bodyView] }
       [ ]
       [ viewArrangementAlgorithmPicker model.arrangementAlgorithmKey
       , viewNameChanger
-      , H.text $ show model.screenDims.width <> "px"
       ]
     ]
 
