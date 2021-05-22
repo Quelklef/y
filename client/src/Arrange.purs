@@ -5,7 +5,6 @@ import Prelude
 import Data.List (List)
 import Data.Map (Map)
 import Data.Map as Map
-import Data.Maybe (fromMaybe)
 import Data.Tuple.Nested ((/\))
 
 import Y.Client.Util.Vec2 (Vec2)
@@ -28,6 +27,5 @@ algorithms = Map.fromFoldable
   , "treelike-naive" /\ ArrangementAlgorithm TreelikeNaive.arrange
   ]
 
-lookupAlgorithm :: String -> ArrangementAlgorithm
-lookupAlgorithm name = Map.lookup name algorithms # fromMaybe defaultAlgo
-  where defaultAlgo = ArrangementAlgorithm TreelikeNaive.arrange
+defaultAlgoKey :: String
+defaultAlgoKey = "treelike-naive"

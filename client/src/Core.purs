@@ -8,6 +8,7 @@ import Data.List as List
 import Y.Shared.Util.Instant (Instant)
 import Y.Shared.Id (Id)
 import Y.Shared.Convo (Convo)
+import Y.Client.Arrange as Arrange
 
 type Model =
   { userId :: Id "User"
@@ -29,7 +30,7 @@ mkInitialModel userId convoId =
   , drafts: Set.empty
   , selectedIds: Set.empty
   , focusedId: Nothing
-  , arrangementAlgorithmKey: "<default>"
+  , arrangementAlgorithmKey: Arrange.defaultAlgoKey
   , nicknameInputValue: Nothing
   }
 

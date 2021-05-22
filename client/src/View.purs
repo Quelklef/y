@@ -115,7 +115,7 @@ view model = { head: headView, body: [bodyView] }
     CardOriginal_Draft _ -> true
     CardOriginal_Message _ -> false
 
-  arrange = case Arrange.lookupAlgorithm model.arrangementAlgorithmKey of
+  arrange = case unsafeFromJust $ Map.lookup model.arrangementAlgorithmKey Arrange.algorithms of
         Arrange.ArrangementAlgorithm algo -> algo
 
   -- Extremely naughty
@@ -368,7 +368,7 @@ view model = { head: headView, body: [bodyView] }
           [ S.fontFamily "inherit"
           ]
           [ A.onInput \newSelection -> Action \m -> pure $ m { arrangementAlgorithmKey = newSelection } ]
-          ( Arrange.algorithms # Map.keys # Set.toUnfoldable # (["<default>"] <> _) # map \algoKey ->
+          ( Arrange.algorithms # Map.keys # Set.toUnfoldable # map \algoKey ->
                 H.option
                 [ if algoKey == selection then A.selected "selected" else mempty ]
                 [ H.text algoKey ]
