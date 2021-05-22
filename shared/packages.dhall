@@ -25,8 +25,8 @@ in upstream //
     , dependencies = [ "prelude", "unsafe-coerce" ]
     }
   , whatwg-html =
-    { repo = "https://github.com/ursi/purescript-whatwg-html.git"
-    , version = "8a2b9bb79abdb50fed1f74780003b50019e5e748"
+    { repo = "https://github.com/quelklef/purescript-whatwg-html.git"
+    , version = "d768dc32c5e0df247f14b330316c1cf419b8229c"
     , dependencies = [ "ffi-options", "mason-prelude", "nullable" ]
     }
   , murmur3 =

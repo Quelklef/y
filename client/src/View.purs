@@ -27,6 +27,7 @@ import Html as H
 import Css as S
 import Attribute as A
 import WHATWG.HTML.KeyboardEvent (toMaybeKeyboardEvent, shiftKey, key) as Wwg
+import WHATWG.DOM.Event (stopPropagation) as Wwg
 
 import Y.Shared.Util.Instant (Instant)
 import Y.Shared.Id (Id)
@@ -199,10 +200,7 @@ view model = { head: headView, body: [bodyView] }
               if Wwg.key keyEvent == "Enter" then
                 case focusedCard.original of
                   CardOriginal_Message _ -> Actions.createDraft
-                  CardOriginal_Draft draft ->
-                    let trimmed = draft { content = String.trim draft.content }
-                        ok = Wwg.shiftKey keyEvent && trimmed.content /= ""
-                    in guard ok $ Actions.sendMessage trimmed
+                  _ -> Actions.noop
 
               -- arrow key controls
               else if Wwg.key keyEvent == "ArrowUp" then
@@ -326,9 +324,19 @@ view model = { head: headView, body: [bodyView] }
         ]
       ]
       [ A.id $ "textarea-for-" <> Id.format card.id  -- hack for being able to set focus on the textareas
+      , A.value $ card.content
       , case card.original of
           CardOriginal_Draft draft -> fold
             [ A.onInput \text -> Actions.editDraft draft.id text
+            , A.on "keydown" \event ->
+                Wwg.toMaybeKeyboardEvent event # foldMap \keyEvent -> do
+                  Wwg.stopPropagation keyEvent
+                  let trimmed = draft { content = String.trim draft.content }
+                      ok = Wwg.key keyEvent == "Enter"
+                           && Wwg.shiftKey keyEvent
+                           && trimmed.content /= ""
+                      action = guard ok $ Actions.sendMessage trimmed
+                  pure action
             ]
           _ -> mempty
       ]
