@@ -26,6 +26,7 @@ import Html (Html)
 import Html as H
 import Css as S
 import Attribute as A
+import WHATWG.HTML.KeyboardEvent (toMaybeKeyboardEvent, shiftKey, key) as Wwg
 
 import Y.Shared.Util.Instant (Instant)
 import Y.Shared.Id (Id)
@@ -34,10 +35,8 @@ import Y.Shared.Convo (EventPayload(..), Message, simulate)
 
 import Y.Client.Util.Vec2 (Vec2)
 import Y.Client.Util.Vec2 as Vec2
-import Y.Client.Util.Opts (defOpts)
 import Y.Client.Util.Memoize (memoizeBy)
 import Y.Client.Util.Global (global)
-import Y.Client.Util.OnKey (onKey, ShouldKeyBePressed(..), keyListenerToAttribute)
 import Y.Client.Core (Model, Draft)
 import Y.Client.Action (Action(..))
 import Y.Client.Actions as Actions
@@ -188,33 +187,40 @@ view model = { head: headView, body: [bodyView] }
     ]
     [ A.tabindex "0"  -- required to pick up key presses
 
-    , keyListenerToAttribute $ fold
-        [ case maybeFocusedCard # map _.original of
-            Just (CardOriginal_Draft draft) ->
-               onKey "Enter" (_ { shift = RequirePressed }) $
-                        let trimmed = String.trim draft.content
-                        in if trimmed == ""
-                        then Actions.noop
-                        else Actions.sendMessage $ draft { content = trimmed }
-            _ ->
-               onKey "Enter" (_ { shift = RequireNotPressed }) Actions.createDraft
-        , case maybeFocusedCard of
-            Nothing -> mempty
-            Just focusedCard -> fold
-              [ onKey "ArrowUp" defOpts $ case Set.toUnfoldable focusedCard.depIds of
+    , A.on "keydown" \event -> pure $
+        Wwg.toMaybeKeyboardEvent event # foldMap \keyEvent ->
+
+          case maybeFocusedCard of
+            Nothing ->
+              guard (Wwg.key keyEvent == "Enter") Actions.createDraft
+
+            Just focusedCard ->
+              -- send/create draft on (shift-)enter
+              if Wwg.key keyEvent == "Enter" then
+                case focusedCard.original of
+                  CardOriginal_Message _ -> Actions.createDraft
+                  CardOriginal_Draft draft ->
+                    let trimmed = draft { content = String.trim draft.content }
+                        ok = Wwg.shiftKey keyEvent && trimmed.content /= ""
+                    in guard ok $ Actions.sendMessage trimmed
+
+              -- arrow key controls
+              else if Wwg.key keyEvent == "ArrowUp" then
+                case Set.toUnfoldable focusedCard.depIds of
                   [id] -> Actions.setFocused id
                   _ -> Actions.noop
 
-              , let replies = Set.toUnfoldable (getReplies focusedCard.id) # Array.sortBy (comparing _.time)
-                    mkArrowListener direction maybeCard
-                      = onKey ("Arrow" <> direction) defOpts $ maybeCard # map (_.id >>> Actions.setFocused) # fromMaybe Actions.noop
-                in fold
-                  [ mkArrowListener "Left" $ replies Array.!! 0
-                  , mkArrowListener "Down" $ replies Array.!! (length replies / 2)
-                  , mkArrowListener "Right" $ replies Array.!! (length replies - 1)
-                  ]
-              ]
-        ]
+              else if ["ArrowLeft", "ArrowRight", "ArrowDown"] # Array.elem (Wwg.key keyEvent) then
+                let replies = Set.toUnfoldable (getReplies focusedCard.id) # Array.sortBy (comparing _.time)
+                in [ "ArrowLeft" /\ { to: 0 }
+                   , "ArrowDown" /\ { to: length replies / 2 }
+                   , "ArrowRight" /\ { to: length replies - 1 }
+                   ]
+                   # foldMap \(key /\ { to }) ->
+                      guard (Wwg.key keyEvent == key) $
+                      replies Array.!! to # foldMap (_.id >>> Actions.setFocused)
+
+              else Actions.noop
     ]
     [ H.divS
       [ S.position "absolute"
