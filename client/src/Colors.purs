@@ -2,8 +2,6 @@ module Y.Client.Colors (make) where
 
 import Prelude
 
-import Debug as Debug
-
 import Data.Int (pow, toNumber)
 import Data.String.CodeUnits (toCharArray)
 import Data.Char (toCharCode)

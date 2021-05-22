@@ -17,6 +17,9 @@ import Y.Client.Core (Model)
 
 newtype Action = Action (Model -> ActionMonad Model)
 
+unAction :: Action -> Model -> ActionMonad Model
+unAction (Action a) = a
+
 instance semigroupAction :: Semigroup Action where
   append (Action a1) (Action a2) = Action (a1 >=> a2)
 

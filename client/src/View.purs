@@ -84,7 +84,7 @@ unsafeFromJust :: forall a. Maybe a -> a
 unsafeFromJust m = unsafePartial $ fromJust m
 
 view :: Model -> { head :: Array (Html Action), body :: Array (Html Action) }
-view model = { head: [], body: [bodyView] }
+view model = { head: headView, body: [bodyView] }
   where
 
   convoState = simulate model.convo.events
@@ -157,6 +157,21 @@ view model = { head: [], body: [bodyView] }
                                    EventPayload_MessageSend pl -> Map.singleton pl.message.authorId event.time
                                    EventPayload_SetName _ -> Map.empty)
                                # foldl Map.union Map.empty  -- left-biased
+
+  headView :: Array (Html Action)
+  headView =
+    [ H.element "style" [] [ H.text $ fold
+        -- Instead of using inline CSS, Elmish assigns classes to nodes and then doles
+        -- out styles via those classes. During a re-render, the node classes might
+        -- change. This is generally not an issue, but can break CSS transitions.
+        -- We get around this limitation by defining our CSS transitions in CSS classes,
+        -- rather that inline on the nodes, and then attach the nodes to the classes.
+        -- TODO: re-inline this style once Elmish is patched.
+        [ ".pan-animation-workaround { transition: transform 0.075s ease-in-out; }"
+        ]
+      ]
+    ]
+
   bodyView :: Html Action
   bodyView =
     H.divS
@@ -203,9 +218,9 @@ view model = { head: [], body: [bodyView] }
       , let firstCard = cards # minimumBy (comparing _.time)
             offset = (maybeFocusedCard <|> firstCard) # map _.id >>= getPosition # fromMaybe zero # negate
         in S.transform $ "translate(" <> show (Vec2.getX offset) <> "px" <> ", " <> show (Vec2.getY offset) <> "px" <> ")"
-      , S.transition "transform 0.075s ease-in-out"  -- hell yes
       ]
-      [ ]
+      [ A.addClass "pan-animation-workaround"
+      ]
       $ let
           arrows = cards >>= \card -> card.depIds
                                     # Set.toUnfoldable

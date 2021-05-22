@@ -17,7 +17,7 @@ import Y.Shared.Convo (Event, EventPayload(..))
 import Y.Shared.Transmission (Transmission(..))
 
 import Y.Client.Core (Model, Draft)
-import Y.Client.Action (Action(..))
+import Y.Client.Action (Action(..), unAction)
 import Y.Client.WebSocket as Ws
 
 noop :: Action
@@ -25,7 +25,22 @@ noop = Action pure
 
 fromEvent :: Event -> Action
 fromEvent event = Action \model ->
-  pure $ model { convo = model.convo { events = model.convo.events <> List.singleton event } }
+  pure $ if model.convo.events # map _.id # List.elem event.id
+         then model
+         else model { convo = model.convo { events = model.convo.events <> List.singleton event } }
+
+sendEvent :: Event -> Action
+sendEvent event = Action \model -> do
+  -- Eagerly record event locally
+  model' <- unAction (fromEvent event) model
+
+  -- Send event to server
+  let convoId = model.convo.id
+  let transmission = Transmission_Push { convoId, event }
+  wsClient <- _.wsClient <$> ask
+  liftEffect $ wsClient # Ws.transmit transmission
+
+  pure $ model'
 
 setFocused :: Id "Message" -> Action
 setFocused id = Action \model -> pure $ model { focusedId = Just id }
@@ -98,11 +113,9 @@ sendMessage draft = Action \model -> do
 
   eventId <- liftEffect Id.new
   let event = { id: eventId, time: now, payload: EventPayload_MessageSend { convoId, message } }
-  let transmission = Transmission_Push { convoId, event }
-  wsClient <- _.wsClient <$> ask
-  liftEffect $ wsClient # Ws.transmit transmission
+  model' <- unAction (sendEvent event) model
 
-  pure $ model { drafts = model.drafts # Set.filter (\d -> d.id /= draft.id) }
+  pure $ model' { drafts = model.drafts # Set.filter (\d -> d.id /= draft.id) }
 
 setName :: String -> Action
 setName newName = Action \model -> do
@@ -112,8 +125,6 @@ setName newName = Action \model -> do
   now <- liftEffect getNow
   eventId <- liftEffect Id.new
   let event = { id: eventId, time: now, payload: EventPayload_SetName { convoId, userId, name: newName } }
-  let transmission = Transmission_Push { convoId, event }
-  wsClient <- _.wsClient <$> ask
-  liftEffect $ wsClient # Ws.transmit transmission
+  model' <- unAction (sendEvent event) model
 
-  pure $ model { nicknameInputValue = Nothing }
+  pure $ model' { nicknameInputValue = Nothing }
