@@ -166,7 +166,8 @@ view model = { head: headView, body: [bodyView] }
 
   headView :: Array (Html Action)
   headView =
-    [ H.element "style" [] [ H.text $ fold
+    [ H.title "⅄"
+    , H.element "style" [] [ H.text $ fold
         -- Instead of using inline CSS, Elmish assigns classes to nodes and then doles
         -- out styles via those classes. During a re-render, the node classes might
         -- change. This is generally not an issue, but can break CSS transitions.
