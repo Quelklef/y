@@ -98,6 +98,11 @@ view model = { head: headView, body: [bodyView] }
   cardsById :: Map (Id "Message") Card
   cardsById = cards # map (\card -> card.id /\ card) # Map.fromFoldable
 
+  getMessage :: Id "Message" -> Maybe Message
+  getMessage id = case Map.lookup id cardsById # map _.original of
+    Just (CardOriginal_Message m) -> Just m
+    _ -> Nothing
+
   getAuthorId :: Card -> Id "User"
   getAuthorId card = case card.original of
     CardOriginal_Message m -> m.authorId
@@ -129,7 +134,7 @@ view model = { head: headView, body: [bodyView] }
   calcDims'cached :: Card -> { width :: Number, height :: Number }
   calcDims'cached = global "QdyjNN4JModpDGXRLgZn" $ Lazy.defer \_ ->
                     memoizeBy (\card -> isDraft card /\ card.id)
-                              (calcDims <<< viewCard Vec2.origin)
+                              (calcDims <<< viewCard Nothing)
 
   positions =
     arrange
@@ -275,7 +280,7 @@ view model = { head: headView, body: [bodyView] }
           arrowHtmls = arrows # map viewArrow
 
           cardHtmls = cards
-                    # map (\card -> getPosition card.id # map \pos -> viewCard pos card)
+                    # map (\card -> getPosition card.id # map \pos -> viewCard (Just pos) card)
                     # List.catMaybes
 
         in List.toUnfoldable (cardHtmls <> arrowHtmls)
@@ -286,25 +291,33 @@ view model = { head: headView, body: [bodyView] }
       , S.right "1rem"
       , S.fontFamily "sans-serif"
       , S.fontSize "14px"
-      , S.textAlign "right"
-      , S.lineHeight "2rem"
+      , S.display "flex"
+      , S.flexDirection "column"
+      , S.alignItems "flex-end"
       ]
       [ ]
       [ viewArrangementAlgorithmPicker model.arrangementAlgorithmKey
       , viewNameChanger
+      , viewUnreadMessageQueue
       ]
     ]
 
-  viewCard :: Vec2 -> Card -> Html Action
-  viewCard position card =
+  -- | Providing a position vector makes it absolutely-positioned;
+  -- | eliding one makes it statically positioned (CSS default)
+  viewCard :: Maybe Vec2 -> Card -> Html Action
+  viewCard maybePosition card =
     H.divS
-    [ S.position "absolute"
-    , S.zIndex $
-        if isFocused card then "2"  -- above other cards
-        else "1"  -- above the arrows
-    , S.top $ (show (unwrap position).y) <> "px"
-    , S.left $ (show (unwrap position).x) <> "px"
-    , S.transform "translate(-50%, -50%)"  -- center the card
+    [ case maybePosition of
+        Just position -> fold
+          [ S.position "absolute"
+          , S.zIndex $
+              if isFocused card then "2"  -- above other cards
+              else "1"  -- above the arrows
+          , S.top $ (show (unwrap position).y) <> "px"
+          , S.left $ (show (unwrap position).x) <> "px"
+          , S.transform "translate(-50%, -50%)"  -- center the card
+          ]
+        Nothing -> mempty
     , S.display "inline-block"
     , S.border $ "1px solid " <> (if isFocused card then "red" else "lightgrey")
     , S.background $ if isUnread card then "#fff8d0" else "white"
@@ -401,7 +414,7 @@ view model = { head: headView, body: [bodyView] }
 
   viewArrangementAlgorithmPicker :: String -> Html Action
   viewArrangementAlgorithmPicker selection =
-    H.div
+    H.p
       [ ]
       [ H.text "arrangement algorithm: "
       , H.selectS
@@ -415,9 +428,9 @@ view model = { head: headView, body: [bodyView] }
           )
       ]
 
-  viewNameChanger ::  Html Action
+  viewNameChanger :: Html Action
   viewNameChanger =
-    H.div
+    H.p
       [ ]
       [ H.text "nickname: "
       , H.inputS
@@ -445,4 +458,47 @@ view model = { head: headView, body: [bodyView] }
         , A.onClick $ Action \m -> pure $ m { nicknameInputValue = Nothing }
         ]
         [ H.text "cancel" ]
+      ]
+
+  viewUnreadMessageQueue :: Html Action
+  viewUnreadMessageQueue =
+    H.divS
+      [ ]
+      [ ]
+      [ H.p [ ] [ H.b [ ] [ H.text "Unread:" ] ]
+      , H.divS
+        [ S.maxHeight "75vh"
+        , S.overflowY "auto"
+        ]
+        [ ]
+        ( model.unreadMessageIds_r
+          # (Set.toUnfoldable :: Set ~> Array)
+          # Array.filter (\id -> isUnread { id })
+          # map getMessage
+          # Array.catMaybes
+          # Array.sortBy (comparing $ \msg -> msg.timeSent /\ msg.id)
+          # map viewUnreadMessage
+        )
+      ]
+
+  viewUnreadMessage :: Message -> Html Action
+  viewUnreadMessage message =
+    H.divS
+      [ S.marginBottom ".5em"
+      , S.maxHeight "5em"
+      , S.overflow "hidden"
+      , S.position "relative"
+      ]
+      [ ]
+      [ H.divS
+        [ S.position "absolute"
+        , S.bottom "0"
+        , S.left "0"
+        , S.width "100%"
+        , S.height "1em"
+        , S.background "linear-gradient(to bottom, transparent, white)"
+        ]
+        [ ]
+        [ ]
+      , viewCard Nothing (mkCard_Message message)
       ]
