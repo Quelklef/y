@@ -5,7 +5,7 @@ let
 inherit (import ../shared/nix.nix { inherit pkgs; }) purs-nix;
 
 nixed = purs-nix.purs
-  { src = builtins.filterSource (path: type: builtins.baseNameOf path != "client") ../.;
+  { srcs = [ ../server ../shared ];
     dependencies =
       with purs-nix.ps-pkgs;
       let ns = purs-nix.ps-pkgs-ns; in
@@ -39,5 +39,9 @@ in {
     mkdir $out
     cp -- ${nixed.modules.Main.bundle {}} $out/index.js
   '';
+
+  shell = pkgs.mkShell {
+    buildInputs = [ (nixed.command {}) ];
+  };
 
 }

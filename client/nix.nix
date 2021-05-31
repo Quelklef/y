@@ -42,14 +42,13 @@ nixed = purs-nix.purs
 
 in {
 
-  deriv = pkgs.stdenv.mkDerivation {
-    name = "y-client";
-    src = ../.;
+  deriv = pkgs.runCommand "y-client" {} ''
+    mkdir $out
+    cp -- ${nixed.modules.Main.bundle {}} $out/index.js
+  '';
 
-    installPhase = ''
-      mkdir $out
-      cp -- ${nixed.modules.Main.bundle {}} $out/index.js
-    '';
-  };
+  shell = pkgs.mkShell {
+    buildInputs = [ (nixed.command {}) ];
+  }
 
 }
