@@ -12,7 +12,7 @@ import Effect.Class (liftEffect)
 
 import Y.Shared.Id (Id)
 import Y.Shared.Id as Id
-import Y.Shared.Convo (Event)
+import Y.Shared.Event (Event)
 import Y.Shared.Transmission (Transmission(..))
 import Y.Shared.Config as Config
 

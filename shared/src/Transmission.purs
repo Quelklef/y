@@ -8,7 +8,7 @@ import Data.Argonaut.Encode.Generic (genericEncodeJson) as Agt
 import Data.Argonaut.Decode.Generic (genericDecodeJson) as Agt
 
 import Y.Shared.Id (Id)
-import Y.Shared.Convo (Event)
+import Y.Shared.Event (Event)
 
 -- | Message from client to server
 -- | Named "transmission" in order to reduce the number of things called "messages"

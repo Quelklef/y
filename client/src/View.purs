@@ -31,9 +31,10 @@ import WHATWG.HTML.KeyboardEvent (toMaybeKeyboardEvent, shiftKey, key) as Wwg
 import WHATWG.DOM.Event (stopPropagation) as Wwg
 
 import Y.Shared.Util.Instant (Instant)
+import Y.Shared.Message (Message)
+import Y.Shared.Event (EventPayload(..))
 import Y.Shared.Id (Id)
 import Y.Shared.Id as Id
-import Y.Shared.Convo (EventPayload(..), Message, simulate)
 
 import Y.Client.Util.Vec2 (Vec2)
 import Y.Client.Util.Vec2 as Vec2
@@ -89,10 +90,8 @@ view :: Model -> { head :: Array (Html Action), body :: Array (Html Action) }
 view model = { head: headView, body: [bodyView] }
   where
 
-  convoState = simulate model.convo.events
-
   cards :: List Card
-  cards = ( Set.toUnfoldable $ (<>) (Set.map mkCard_Message convoState.messages) (Set.map mkCard_Draft model.drafts) )
+  cards = ( Set.toUnfoldable $ (<>) (Set.map mkCard_Message model.messages_r) (Set.map mkCard_Draft model.drafts) )
         # List.sortBy (comparing _.id)  -- shouldn't be required; is a workaround for ursi/purescript-elmish issue #5
 
   cardsById :: Map (Id "Message") Card
@@ -144,7 +143,7 @@ view model = { head: headView, body: [bodyView] }
   getPosition id = positions # Map.lookup id
 
   getAuthorName :: Id "User" -> String
-  getAuthorName id = convoState.userNames # Map.lookup id # fromMaybe "<anonymous>"
+  getAuthorName id = model.userNames_r # Map.lookup id # fromMaybe "<anonymous>"
 
   getReplies :: Id "Message" -> Set Card
   getReplies = \id -> Map.lookup id mapping # fromMaybe Set.empty
@@ -154,11 +153,11 @@ view model = { head: headView, body: [bodyView] }
   getUserColor :: Id "User" -> String
   getUserColor id = List.findIndex (_ == id) userIdsChronologically # map (Colors.make seed) # fromMaybe "black"
     where
-      seed = Id.format model.convo.id
+      seed = Id.format model.convoId
       userIdsChronologically = Map.keys userIdToFirstMessageTime
                              # Set.toUnfoldable
                              # List.sortBy (comparing $ flip Map.lookup userIdToFirstMessageTime)
-      userIdToFirstMessageTime = model.convo.events
+      userIdToFirstMessageTime = model.events
                                # map (\event -> case event.payload of
                                    EventPayload_MessageSend pl -> Map.singleton pl.message.authorId event.time
                                    EventPayload_SetName _ -> Map.empty)

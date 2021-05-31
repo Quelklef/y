@@ -20,13 +20,18 @@ import Partial.Unsafe (unsafePartial)
 
 import Y.Shared.Id (Id)
 import Y.Shared.Id as Id
-import Y.Shared.Convo (Convo, Event)
+import Y.Shared.Event (Event)
 import Y.Shared.Transmission (Transmission(..))
 import Y.Shared.Config as Config
 
 import Y.Server.Util.Relation (Relation)
 import Y.Server.Util.Relation as Relation
 import Y.Server.WebSocket as Ws
+
+type Convo =
+  { id :: Id "Convo"
+  , events :: List Event  -- expected to be sorted by time
+  }
 
 type Client = Ws.Client Transmission (List Event)
 

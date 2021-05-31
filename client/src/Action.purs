@@ -10,7 +10,7 @@ import Control.Monad.Reader.Trans (ReaderT, runReaderT)
 import Control.Monad.Reader.Class (class MonadAsk, ask)
 
 import Y.Shared.Transmission (Transmission)
-import Y.Shared.Convo (Event)
+import Y.Shared.Event (Event)
 
 import Y.Client.WebSocket as Ws
 import Y.Client.Core (Model)

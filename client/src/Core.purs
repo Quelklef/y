@@ -3,16 +3,28 @@ module Y.Client.Core where
 import Data.Set (Set)
 import Data.Set as Set
 import Data.Maybe (Maybe(..))
+import Data.List (List)
 import Data.List as List
+import Data.Map (Map)
+import Data.Map as Map
 
 import Y.Shared.Util.Instant (Instant)
 import Y.Shared.Id (Id)
-import Y.Shared.Convo (Convo)
+import Y.Shared.Event (Event)
+import Y.Shared.Message (Message)
 import Y.Client.Arrange as Arrange
 
 type Model =
   { userId :: Id "User"
-  , convo :: Convo
+  , convoId :: Id "Convo"
+  , events :: List Event
+  -- v "_r" = "redundant", computed from events
+  -- v TODO: having computed info in the model directly seems not ideal
+  -- v       it requires any caller which updates .events to also worry
+  -- v       about recomputing the other stuff
+  -- v       (Currently ok since .events is only changed in 1 location)
+  , userNames_r :: Map (Id "User") String
+  , messages_r :: Set Message
   , drafts :: Set Draft
   , selectedIds :: Set (Id "Message")
   , focusedId :: Maybe (Id "Message")
@@ -24,10 +36,10 @@ type Model =
 mkInitialModel :: Id "User" -> Id "Convo" -> Model
 mkInitialModel userId convoId =
   { userId: userId
-  , convo:
-    { id: convoId
-    , events: List.Nil
-    }
+  , convoId: convoId
+  , events: List.Nil
+  , userNames_r: Map.empty
+  , messages_r: Set.empty
   , drafts: Set.empty
   , selectedIds: Set.empty
   , focusedId: Nothing
