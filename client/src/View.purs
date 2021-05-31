@@ -32,7 +32,7 @@ import WHATWG.DOM.Event (stopPropagation) as Wwg
 
 import Y.Shared.Util.Instant (Instant)
 import Y.Shared.Message (Message)
-import Y.Shared.Event (EventPayload(..))
+import Y.Shared.Event (Event(..), EventPayload(..))
 import Y.Shared.Id (Id)
 import Y.Shared.Id as Id
 
@@ -40,6 +40,7 @@ import Y.Client.Util.Vec2 (Vec2)
 import Y.Client.Util.Vec2 as Vec2
 import Y.Client.Util.Memoize (memoizeBy)
 import Y.Client.Util.Global (global)
+import Y.Client.Util.Sorted as Sorted
 import Y.Client.Core (Model, Draft)
 import Y.Client.Action (Action(..))
 import Y.Client.Actions as Actions
@@ -158,7 +159,7 @@ view model = { head: headView, body: [bodyView] }
                              # Set.toUnfoldable
                              # List.sortBy (comparing $ flip Map.lookup userIdToFirstMessageTime)
       userIdToFirstMessageTime = model.events
-                               # map (\event -> case event.payload of
+                               # Sorted.map (\(Event event) -> case event.payload of
                                    EventPayload_MessageSend pl -> Map.singleton pl.message.authorId event.time
                                    EventPayload_SetName _ -> Map.empty)
                                # foldl Map.union Map.empty  -- left-biased

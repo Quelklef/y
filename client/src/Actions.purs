@@ -15,9 +15,10 @@ import Control.Monad.Reader.Class (ask)
 import Y.Shared.Util.Instant (getNow)
 import Y.Shared.Id (Id)
 import Y.Shared.Id as Id
-import Y.Shared.Event (Event, EventPayload(..))
+import Y.Shared.Event (Event(..), EventPayload(..))
 import Y.Shared.Transmission (Transmission(..))
 
+import Y.Client.Util.Sorted as Sorted
 import Y.Client.Core (Model, Draft)
 import Y.Client.Action (Action(..), unAction)
 import Y.Client.WebSocket as Ws
@@ -26,23 +27,23 @@ noop :: Action
 noop = Action pure
 
 fromEvent :: Event -> Action
-fromEvent = \event -> Action \model -> pure $
+fromEvent = \(Event event) -> Action \model -> pure $
   let
-    alreadySeen = model.events # map _.id # List.elem event.id
-    isLatest = model.events # List.last # map _.time # map (_ < event.time) # fromMaybe true
-    model' = model { events = List.snoc model.events event }  -- TODO: sort
+    alreadySeen = model.events # Sorted.map (\(Event ev) -> ev.id) # List.elem event.id
+    isLatest = model.events # Sorted.unSorted # List.last # map (\(Event ev) -> ev.time) # map (_ < event.time) # fromMaybe true
+    model' = model { events = Sorted.insert (Event event) model.events }
   in
     -- if event is already seen, no need to do anythign
     if alreadySeen then model
     -- if appending event, do so incrementally
-    else if isLatest then patch event model'
+    else if isLatest then patch (Event event) model'
     -- otherwise, have to recompute everything
     else recompute model'
 
   where
 
   patch :: Event -> Model -> Model
-  patch event model =
+  patch (Event event) model =
     case event.payload of
       EventPayload_SetName pl ->
         model { userNames_r = model.userNames_r # Map.insert pl.userId pl.name }
@@ -140,7 +141,7 @@ sendMessage draft = Action \model -> do
         }
 
   eventId <- liftEffect Id.new
-  let event = { id: eventId, time: now, payload: EventPayload_MessageSend { convoId, message } }
+  let event = Event { id: eventId, time: now, payload: EventPayload_MessageSend { convoId, message } }
   model' <- unAction (sendEvent event) model
 
   pure $ model' { drafts = model.drafts # Set.filter (\d -> d.id /= draft.id) }
@@ -152,7 +153,7 @@ setName newName = Action \model -> do
 
   now <- liftEffect getNow
   eventId <- liftEffect Id.new
-  let event = { id: eventId, time: now, payload: EventPayload_SetName { convoId, userId, name: newName } }
+  let event = Event { id: eventId, time: now, payload: EventPayload_SetName { convoId, userId, name: newName } }
   model' <- unAction (sendEvent event) model
 
   pure $ model' { nicknameInputValue = Nothing }

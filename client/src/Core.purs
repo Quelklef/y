@@ -9,6 +9,8 @@ import Data.Map (Map)
 import Data.Map as Map
 
 import Y.Shared.Util.Instant (Instant)
+import Y.Client.Util.Sorted (Sorted)
+import Y.Client.Util.Sorted as Sorted
 import Y.Shared.Id (Id)
 import Y.Shared.Event (Event)
 import Y.Shared.Message (Message)
@@ -17,7 +19,7 @@ import Y.Client.Arrange as Arrange
 type Model =
   { userId :: Id "User"
   , convoId :: Id "Convo"
-  , events :: List Event
+  , events :: Sorted Event
   -- v "_r" = "redundant", computed from events
   -- v TODO: having computed info in the model directly seems not ideal
   -- v       it requires any caller which updates .events to also worry
@@ -37,7 +39,7 @@ mkInitialModel :: Id "User" -> Id "Convo" -> Model
 mkInitialModel userId convoId =
   { userId: userId
   , convoId: convoId
-  , events: List.Nil
+  , events: Sorted.sort List.Nil
   , userNames_r: Map.empty
   , messages_r: Set.empty
   , drafts: Set.empty

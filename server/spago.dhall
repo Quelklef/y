@@ -23,5 +23,6 @@
   , "arrays"
   , "node-buffer"
   , "debuggest"
+  , "tuples"
   ]
 }
