@@ -47,12 +47,29 @@ fromEvent = \(Event event) -> Action \model -> pure $
     case event.payload of
       EventPayload_SetName pl ->
         model { userNames_r = model.userNames_r # Map.insert pl.userId pl.name }
+
       EventPayload_MessageSend pl ->
-        model { messages_r = model.messages_r <> Set.singleton pl.message }
+        model { messages_r = model.messages_r <> Set.singleton pl.message
+              , unreadMessageIds_r =
+                  if pl.message.authorId == model.userId
+                  then model.unreadMessageIds_r
+                  else model.unreadMessageIds_r # Set.insert pl.message.id
+              }
+
+      EventPayload_SetReadState pl ->
+        model { unreadMessageIds_r =
+                  model.unreadMessageIds_r
+                  # (if not pl.readState then Set.insert else Set.delete) pl.messageId
+              }
 
   recompute :: Model -> Model
   recompute model = model.events # foldl (flip patch) model0
-    where model0 = model { userNames_r = Map.empty, messages_r = Set.empty }
+    where
+    model0 = model
+      { userNames_r = Map.empty
+      , messages_r = Set.empty
+      , unreadMessageIds_r = Set.empty
+      }
 
 sendEvent :: Event -> Action
 sendEvent event = Action \model -> do
@@ -157,3 +174,22 @@ setName newName = Action \model -> do
   model' <- unAction (sendEvent event) model
 
   pure $ model' { nicknameInputValue = Nothing }
+
+setReadState :: Id "Message" -> Boolean -> Action
+setReadState messageId newReadState = Action \model -> do
+  now <- liftEffect getNow
+  eventId <- liftEffect Id.new
+
+  let event = Event
+        { id: eventId
+        , time: now
+        , payload: EventPayload_SetReadState
+          { convoId: model.convoId
+          , userId: model.userId
+          , messageId: messageId
+          , readState: newReadState
+          }
+        }
+
+  model' <- unAction (sendEvent event) model
+  pure model'

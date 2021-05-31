@@ -15,7 +15,8 @@ import Y.Shared.Event (Event)
 data Transmission
 
   = Transmission_Subscribe
-    { convoId :: Id "Convo"
+    { userId :: Id "User"  -- identity of subscribing client
+    , convoId :: Id "Convo"
     }
 
   | Transmission_Pull

@@ -112,6 +112,9 @@ view model = { head: headView, body: [bodyView] }
   isSelected :: forall r. { id :: Id "Message" | r } -> Boolean
   isSelected { id } = model.selectedIds # Set.member id
 
+  isUnread :: forall r. { id :: Id "Message" | r } -> Boolean
+  isUnread { id } = model.unreadMessageIds_r # Set.member id
+
   isDraft :: Card -> Boolean
   isDraft card = case card.original of
     CardOriginal_Draft _ -> true
@@ -161,7 +164,8 @@ view model = { head: headView, body: [bodyView] }
       userIdToFirstMessageTime = model.events
                                # Sorted.map (\(Event event) -> case event.payload of
                                    EventPayload_MessageSend pl -> Map.singleton pl.message.authorId event.time
-                                   EventPayload_SetName _ -> Map.empty)
+                                   EventPayload_SetName _ -> Map.empty
+                                   EventPayload_SetReadState _ -> Map.empty)
                                # foldl Map.union Map.empty  -- left-biased
 
   headView :: Array (Html Action)
@@ -223,6 +227,10 @@ view model = { head: headView, body: [bodyView] }
               -- Select card on E
               else if Wwg.key keyEvent == "e" then
                 Actions.setSelected focusedCard.id (not $ isSelected focusedCard)
+
+              -- Mark read/unread on R
+              else if Wwg.key keyEvent == "r" then
+                Actions.setReadState focusedCard.id (isUnread focusedCard)
 
               -- arrow key controls
               else if Wwg.key keyEvent == "ArrowUp" then
@@ -299,7 +307,7 @@ view model = { head: headView, body: [bodyView] }
     , S.transform "translate(-50%, -50%)"  -- center the card
     , S.display "inline-block"
     , S.border $ "1px solid " <> (if isFocused card then "red" else "lightgrey")
-    , S.background "white"
+    , S.background $ if isUnread card then "#fff8d0" else "white"
     , S.padding ".8rem 1.2rem"
     , S.borderRadius ".3em"
     , S.boxShadow "0 2px 6px -4px rgb(0 0 0 / 50%)"

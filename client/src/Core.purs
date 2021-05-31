@@ -27,6 +27,7 @@ type Model =
   -- v       (Currently ok since .events is only changed in 1 location)
   , userNames_r :: Map (Id "User") String
   , messages_r :: Set Message
+  , unreadMessageIds_r :: Set (Id "Message")
   , drafts :: Set Draft
   , selectedIds :: Set (Id "Message")
   , focusedId :: Maybe (Id "Message")
@@ -42,6 +43,7 @@ mkInitialModel userId convoId =
   , events: Sorted.sort List.Nil
   , userNames_r: Map.empty
   , messages_r: Set.empty
+  , unreadMessageIds_r: Set.empty
   , drafts: Set.empty
   , selectedIds: Set.empty
   , focusedId: Nothing

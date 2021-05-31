@@ -14,13 +14,15 @@ import Data.Map (Map)
 import Data.Map as Map
 import Data.List (List)
 import Data.List as List
+import Data.Set (Set)
 import Data.Set as Set
 import Data.Traversable (for_)
+import Data.Monoid (guard)
 import Partial.Unsafe (unsafePartial)
 
 import Y.Shared.Id (Id)
 import Y.Shared.Id as Id
-import Y.Shared.Event (Event)
+import Y.Shared.Event (Event(..), EventPayload(..))
 import Y.Shared.Transmission (Transmission(..))
 import Y.Shared.Config as Config
 
@@ -38,9 +40,10 @@ type Client = Ws.Client Transmission (List Event)
 -- | Relates clients to the conversations that they are subscribed to
 type Subs = Relation (Id "Client") (Id "Convo")
 
--- | Keep track of ongoing conversations and clients
-type Convos = Map (Id "Convo") Convo
-type Clients = Map (Id "Client") Client
+-- | Keep track of...
+type Convos = Map (Id "Convo") Convo  -- ongoing conversations
+type Clients = Map (Id "Client") Client  -- connected clients
+type UserIds = Map (Id "Client") (Id "User")  -- client user ids
 
 -- TODO: this setup is... ugly.
 
@@ -72,6 +75,7 @@ main = do
   subsRef <- Ref.new (Relation.empty :: Subs)
   convosRef <- Ref.new (Map.empty :: Convos)
   clientsRef <- Ref.new (Map.empty :: Clients)
+  userIdsRef <- Ref.new (Map.empty :: UserIds)
 
   server <- Ws.newServer { port: Config.webSocketPort }
 
@@ -86,8 +90,9 @@ main = do
       Left err -> Console.warn $ "Warning: transmission failed to decode; details:\n" <> err
       Right tn -> do
         case tn of
-          Transmission_Subscribe { convoId } -> do
+          Transmission_Subscribe { userId, convoId } -> do
             subsRef # Ref.modify_ (Relation.incl clientId convoId)
+            userIdsRef # Ref.modify_ (Map.insert clientId userId)
 
           Transmission_Pull { convoId } -> do
             convo <- convos_get convoId convosRef
@@ -95,10 +100,17 @@ main = do
             client # Ws.transmit events
 
           Transmission_Push { convoId, event } -> do
-            -- v Push event
+            -- v Log event
             convosRef # convos_modify convoId \convo -> convo { events = convo.events <> List.singleton event }
-            -- v Notify subscribed clients
-            subbedClientIds :: Array (Id "Client") <- Ref.read subsRef <#> Relation.rget convoId >>> Set.toUnfoldable
+            -- v Notify interested clients
+            subbedClientIds :: Set (Id "Client") <- Ref.read subsRef <#> Relation.rget convoId
+            clientUserId <- Ref.read userIdsRef <#> Map.lookup clientId
+            let (interestedClientIds :: Array (Id "Client")) = Set.toUnfoldable $
+                  case event of
+                      Event { payload: EventPayload_SetName _ } -> subbedClientIds
+                      Event { payload: EventPayload_MessageSend _ } -> subbedClientIds
+                      Event { payload: EventPayload_SetReadState { userId } } ->
+                        guard (clientUserId == Just userId) $ Set.singleton clientId
             for_ subbedClientIds \subbedClientId -> do
               clients <- Ref.read clientsRef
               let (subbed :: Client) = unsafePartial $ fromJust $ Map.lookup subbedClientId clients

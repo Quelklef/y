@@ -36,6 +36,13 @@ data EventPayload
     , message :: Message
     }
 
+  | EventPayload_SetReadState
+   { convoId :: Id "Convo"
+   , userId :: Id "User"
+   , messageId :: Id "Message"
+   , readState :: Boolean
+   }
+
 derive instance eqEvent :: Eq Event
 derive instance genericEvent :: Generic Event _
 
