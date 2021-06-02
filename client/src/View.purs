@@ -20,6 +20,8 @@ import Data.String.CodeUnits (length) as String
 import Data.String.Common (trim, split) as String
 import Data.String.Pattern (Pattern(..)) as String
 import Data.Lazy as Lazy
+import Effect.Ref as Ref
+import Effect.Unsafe (unsafePerformEffect)
 import Control.Alt ((<|>))
 import Partial.Unsafe (unsafePartial)
 
@@ -38,7 +40,7 @@ import Y.Shared.Id as Id
 
 import Y.Client.Util.Vec2 (Vec2)
 import Y.Client.Util.Vec2 as Vec2
-import Y.Client.Util.Memoize (memoizeBy)
+import Y.Client.Util.Memoize (memoize)
 import Y.Client.Util.Global (global)
 import Y.Client.Util.Sorted as Sorted
 import Y.Client.Core (Model, Draft)
@@ -128,13 +130,14 @@ view model = { head: headView, body: [bodyView] }
   arrange = case unsafeFromJust $ Map.lookup model.arrangementAlgorithmKey Arrange.algorithms of
         Arrange.ArrangementAlgorithm algo -> algo
 
-  -- Extremely naughty
-  -- Uses the 'viewCard' closure from the *first* render in order to calculate
-  -- dimensions for that *and all subsequent* renders
   calcDims'cached :: Card -> { width :: Number, height :: Number }
-  calcDims'cached = global "QdyjNN4JModpDGXRLgZn" $ Lazy.defer \_ ->
-                    memoizeBy (\card -> isDraft card /\ card.id)
-                              (calcDims <<< viewCard Nothing)
+  calcDims'cached =
+    let dimsCache = global "QdyjNN4JModpDGXRLgZn" $ Lazy.defer \_ -> unsafePerformEffect $ Ref.new Map.empty
+    in memoize
+        { func: calcDims <<< viewCard Nothing
+        , with: dimsCache
+        , by: \card -> isDraft card /\ card.id
+        }
 
   positions =
     arrange
@@ -159,8 +162,8 @@ view model = { head: headView, body: [bodyView] }
     where mapping = cards >>= (\card -> card.depIds # Set.toUnfoldable # map \depId -> Map.singleton depId (Set.singleton card))
                   # foldl (Map.unionWith Set.union) Map.empty
 
-  getUserColor :: Id "User" -> String
-  getUserColor id = List.findIndex (_ == id) userIdsChronologically # map (Colors.make seed) # fromMaybe "black"
+  getUserHue :: Id "User" -> Maybe Number
+  getUserHue id = List.findIndex (_ == id) userIdsChronologically # map (Colors.hueSeq seed)
     where
       seed = Id.format model.convoId
       userIdsChronologically = Map.keys userIdToFirstMessageTime
@@ -323,7 +326,7 @@ view model = { head: headView, body: [bodyView] }
     , S.background $ if isUnread card then "#fff8d0" else "white"
     , S.padding ".8rem 1.2rem"
     , S.borderRadius ".3em"
-    , S.boxShadow "0 2px 6px -4px rgb(0 0 0 / 50%)"
+    , S.boxShadow $ "0 0 8px -2px " <> "hsla(" <> show (unsafeFromJust $ getUserHue $ getAuthorId card) <> " 100% 50% / 25%)"
     , S.fontFamily "sans-serif"
     , S.fontSize "13px"
     , S.minWidth "18ch"
@@ -342,7 +345,6 @@ view model = { head: headView, body: [bodyView] }
           H.divS
           [ S.fontSize "0.75em"
           , S.fontStyle "italic"
-          , S.opacity "0.5"
           , S.marginBottom "0.5em"
           , S.paddingTop "1px"
           ]
@@ -350,14 +352,17 @@ view model = { head: headView, body: [bodyView] }
           [ H.spanS
             [ S.height "0.5em"
             , S.width "0.5em"
-            , S.backgroundColor $ getUserColor (getAuthorId card)
+            , S.backgroundColor $ "hsl(" <> show (unsafeFromJust $ getUserHue $ getAuthorId card) <> ", 100%, 50%)"
             , S.border "1px solid black"
             , S.marginRight "0.5em"
             , S.display "inline-block"
             ]
             [ ]
             [ ]
-          , H.text $ message.authorId # getAuthorName
+          , H.spanS
+            [ S.opacity "0.5" ]
+            [ ]
+            [ H.text $ message.authorId # getAuthorName ]
           ]
     , (if isDraft card then H.textareaS else H.divS)
       [ S.padding "0"
