@@ -33,15 +33,41 @@ nixed = purs-nix.purs
       ];
   };
 
+  # We have 1 node dependency
+  # I don't want to deal with node2nix or anything, so we'll handle it manually
+  node_ws = builtins.fetchTarball {
+    url = "https://registry.npmjs.org/ws/-/ws-7.4.6.tgz";
+    sha256 = "1xny147xgyqyghxcxgdvcm82fwkawlxc2qgcnvldcw4mcrdqdjqz";
+  };
+
 in {
 
-  deriv = pkgs.runCommand "y-server" {} ''
-    mkdir $out
-    cp -- ${nixed.modules.Main.bundle {}} $out/index.js
-  '';
+  deriv = pkgs.stdenv.mkDerivation {
+    name = "y-server";
+    src = ./.;
+
+    buildInputs = [ pkgs.nodejs ];
+
+    installPhase = ''
+      mkdir $out
+
+      cp ${nixed.modules.Main.bundle {}} $out/index.js
+
+      mkdir -p $out/node_modules/ws
+      cp -r ${node_ws}/* $out/node_modules/ws
+
+      echo "${pkgs.nodejs}/bin/node $out/index.js" > $out/run.sh
+      chmod +x $out/run.sh
+    '';
+  };
 
   shell = pkgs.mkShell {
-    buildInputs = [ (nixed.command {}) ];
+    buildInputs =
+      [ (nixed.command {
+          srcs = [ "$PWD/../server" "$PWD/../shared" ];
+        })
+        pkgs.nodejs
+      ];
   };
 
 }

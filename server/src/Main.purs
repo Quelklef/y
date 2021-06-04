@@ -2,8 +2,6 @@ module Main where
 
 import Prelude
 
-import Debug as Debug
-
 import Effect (Effect)
 import Effect.Ref (Ref)
 import Effect.Ref as Ref
@@ -64,6 +62,8 @@ convos_modify convoId f convosRef = do
 main :: Effect Unit
 main = do
 
+  Console.log "Running"
+
   subsRef <- Ref.new (Relation.empty :: Subs)
   convosRef <- Ref.new (Map.empty :: Convos)
   clientsRef <- Ref.new (Map.empty :: Clients)
@@ -86,7 +86,7 @@ main = do
 
           Transmission_Pull { convoId } -> do
             convo <- convos_get convoId convosRef
-            let events = (Debug.log convo).events
+            let events = convo.events
             client # Ws.transmit events
 
           Transmission_Push { convoId, event } -> do
