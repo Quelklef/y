@@ -11,6 +11,7 @@ import Data.List as List
 import Data.Array as Array
 import Data.Maybe (Maybe(..), fromJust, fromMaybe, isNothing)
 import Data.Int as Int
+import Data.Number (infinity)
 import Data.Tuple.Nested ((/\))
 import Data.Foldable (fold, foldl, minimumBy, length, maximum, foldMap)
 import Data.Newtype (unwrap)
@@ -33,8 +34,8 @@ import WHATWG.HTML.KeyboardEvent (toMaybeKeyboardEvent, shiftKey, key) as Wwg
 import WHATWG.DOM.Event (stopPropagation) as Wwg
 
 import Y.Shared.Util.Instant (Instant)
+import Y.Shared.Util.Instant as Instant
 import Y.Shared.Message (Message)
-import Y.Shared.Event (Event(..), EventPayload(..))
 import Y.Shared.Id (Id)
 import Y.Shared.Id as Id
 
@@ -42,7 +43,6 @@ import Y.Client.Util.Vec2 (Vec2)
 import Y.Client.Util.Vec2 as Vec2
 import Y.Client.Util.Memoize (memoize)
 import Y.Client.Util.Global (global)
-import Y.Client.Util.Sorted as Sorted
 import Y.Client.Core (Model, Draft)
 import Y.Client.Action (Action(..))
 import Y.Client.Actions as Actions
@@ -169,11 +169,10 @@ view model = { head: headView, body: [bodyView] }
       userIdsChronologically = Map.keys userIdToFirstMessageTime
                              # Set.toUnfoldable
                              # List.sortBy (comparing $ flip Map.lookup userIdToFirstMessageTime)
-      userIdToFirstMessageTime = model.events
-                               # Sorted.map (\(Event event) -> case event.payload of
-                                   EventPayload_MessageSend pl -> Map.singleton pl.message.authorId event.time
-                                   EventPayload_SetName _ -> Map.empty
-                                   EventPayload_SetReadState _ -> Map.empty)
+      userIdToFirstMessageTime = cards
+                               # map (\card -> case card.original of
+                                   CardOriginal_Message m -> Map.singleton m.authorId (Instant.asMilliseconds m.timeSent)
+                                   CardOriginal_Draft d -> Map.singleton model.userId infinity)
                                # foldl Map.union Map.empty  -- left-biased
 
   headView :: Array (Html Action)
