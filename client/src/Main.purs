@@ -12,7 +12,7 @@ import Effect.Class (liftEffect)
 
 import Y.Shared.Id (Id)
 import Y.Shared.Id as Id
-import Y.Shared.Convo (Event)
+import Y.Shared.Event (Event)
 import Y.Shared.Transmission (Transmission(..))
 import Y.Shared.Config as Config
 
@@ -72,5 +72,5 @@ main = do
   -- Kick the thing off!
   wsClient # Ws.onOpen do
     Console.log "WebSocket opened"
-    wsClient # Ws.transmit (Transmission_Subscribe { convoId })
+    wsClient # Ws.transmit (Transmission_Subscribe { userId, convoId })
     wsClient # Ws.transmit (Transmission_Pull { convoId })

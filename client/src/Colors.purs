@@ -1,4 +1,4 @@
-module Y.Client.Colors (make) where
+module Y.Client.Colors (hueSeq) where
 
 import Prelude
 
@@ -8,7 +8,7 @@ import Data.Char (toCharCode)
 import Data.Foldable (sum)
 import Math (remainder)
 
--- @make seed@ is a sequence of CSS color values each of which is
+-- @hueSeq seed@ is a sequence of hue values in [0, 1] each of which is
 -- reasonably far apart from all of the previous.
 --
 -- We use this to generate the colors that we associate with users.
@@ -19,12 +19,12 @@ import Math (remainder)
 -- a hue shift which is applied to the entire sequence. (This is
 -- done in a chaotic manner, so the actual values of the seeds
 -- doesn't matter, only that they differ from sequence to sequence.)
-make :: String -> Int -> String
-make seed index =
+hueSeq :: String -> Int -> Number
+hueSeq seed index =
   let hueShift = stringToPercent seed
       hue = (nthHue index + hueShift) * 360.0
   in
-    "hsl(" <> show hue <> ", 100%, 50%)"
+      hue
 
 -- | Takes a string and chaotically returns a number in [0, 1]
 stringToPercent :: String -> Number
