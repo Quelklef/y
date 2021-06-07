@@ -477,7 +477,6 @@ view model = { head: headView, body: [bodyView] }
         [ ]
         ( model.unreadMessageIds_r
           # (Set.toUnfoldable :: Set ~> Array)
-          # Array.filter (\id -> isUnread { id })
           # map getMessage
           # Array.catMaybes
           # Array.sortBy (comparing $ \msg -> msg.timeSent /\ msg.id)
