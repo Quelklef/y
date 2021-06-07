@@ -469,6 +469,18 @@ view model = { head: headView, body: [bodyView] }
 
   viewUnreadMessageQueue :: Html Action
   viewUnreadMessageQueue =
+    let
+      unreadMessages =
+          model.unreadMessageIds_r
+          # (Set.toUnfoldable :: Set ~> Array)
+          # (let redundant id = let depIds = (unsafeFromJust $ getCard id).depIds
+                                in depIds /= mempty && all isUnread depIds
+             in Array.filter $ not <<< redundant)
+          # map getMessage
+          # Array.catMaybes
+          # Array.sortBy (comparing $ \msg -> msg.timeSent /\ msg.id)
+    in
+    guard (unreadMessages /= mempty) $
     H.divS
       [ ]
       [ ]
@@ -478,16 +490,7 @@ view model = { head: headView, body: [bodyView] }
         , S.overflowY "auto"
         ]
         [ ]
-        ( model.unreadMessageIds_r
-          # (Set.toUnfoldable :: Set ~> Array)
-          # (let redundant id = let depIds = (unsafeFromJust $ getCard id).depIds
-                                in depIds /= mempty && all isUnread depIds
-             in Array.filter $ not <<< redundant)
-          # map getMessage
-          # Array.catMaybes
-          # Array.sortBy (comparing $ \msg -> msg.timeSent /\ msg.id)
-          # map viewUnreadMessage
-        )
+        ( unreadMessages # map viewUnreadMessage )
       ]
 
   viewUnreadMessage :: Message -> Html Action
