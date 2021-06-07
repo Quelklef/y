@@ -13,7 +13,7 @@ import Data.Maybe (Maybe(..), fromJust, fromMaybe, isNothing)
 import Data.Int as Int
 import Data.Number (infinity)
 import Data.Tuple.Nested ((/\))
-import Data.Foldable (fold, foldl, minimumBy, length, maximum, foldMap)
+import Data.Foldable (fold, foldl, minimumBy, length, maximum, foldMap, all)
 import Data.Newtype (unwrap)
 import Data.Generic.Rep (class Generic)
 import Data.Monoid (guard)
@@ -100,6 +100,9 @@ view model = { head: headView, body: [bodyView] }
   cardsById :: Map (Id "Message") Card
   cardsById = cards # map (\card -> card.id /\ card) # Map.fromFoldable
 
+  getCard :: Id "Message" -> Maybe Card
+  getCard id = Map.lookup id cardsById
+
   getMessage :: Id "Message" -> Maybe Message
   getMessage id = case Map.lookup id cardsById # map _.original of
     Just (CardOriginal_Message m) -> Just m
@@ -119,8 +122,8 @@ view model = { head: headView, body: [bodyView] }
   isSelected :: forall r. { id :: Id "Message" | r } -> Boolean
   isSelected { id } = model.selectedIds # Set.member id
 
-  isUnread :: forall r. { id :: Id "Message" | r } -> Boolean
-  isUnread { id } = model.unreadMessageIds_r # Set.member id
+  isUnread :: Id "Message" -> Boolean
+  isUnread id = model.unreadMessageIds_r # Set.member id
 
   isDraft :: Card -> Boolean
   isDraft card = case card.original of
@@ -237,7 +240,7 @@ view model = { head: headView, body: [bodyView] }
 
               -- Mark read/unread on R
               else if Wwg.key keyEvent == "r" then
-                Actions.setReadState focusedCard.id (isUnread focusedCard)
+                Actions.setReadState focusedCard.id (isUnread focusedCard.id)
 
               -- arrow key controls
               else if Wwg.key keyEvent == "ArrowUp" then
@@ -322,7 +325,7 @@ view model = { head: headView, body: [bodyView] }
         Nothing -> mempty
     , S.display "inline-block"
     , S.border $ "1px solid " <> (if isFocused card then "red" else "lightgrey")
-    , S.background $ if isUnread card then "#fff8d0" else "white"
+    , S.background $ if isUnread card.id then "#fff8d0" else "white"
     , S.padding ".8rem 1.2rem"
     , S.borderRadius ".3em"
     , S.boxShadow $ "0 0 8px -2px " <> "hsla(" <> show (unsafeFromJust $ getUserHue $ getAuthorId card) <> " 100% 50% / 25%)"
@@ -477,6 +480,9 @@ view model = { head: headView, body: [bodyView] }
         [ ]
         ( model.unreadMessageIds_r
           # (Set.toUnfoldable :: Set ~> Array)
+          # (let redundant id = let depIds = (unsafeFromJust $ getCard id).depIds
+                                in depIds /= mempty && all isUnread depIds
+             in Array.filter $ not <<< redundant)
           # map getMessage
           # Array.catMaybes
           # Array.sortBy (comparing $ \msg -> msg.timeSent /\ msg.id)
