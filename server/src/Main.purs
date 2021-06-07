@@ -112,10 +112,10 @@ main = do
                       Event { payload: EventPayload_MessageSend _ } -> subbedClientIds
                       Event { payload: EventPayload_SetReadState { userId } } ->
                         guard (clientUserId == Just userId) $ Set.singleton clientId
-            for_ subbedClientIds \subbedClientId -> do
+            for_ interestedClientIds \interestedClientId -> do
               clients <- Ref.read clientsRef
-              let (subbed :: Client) = unsafePartial $ fromJust $ Map.lookup subbedClientId clients
-              subbed # Ws.transmit (Transmission.ToClient_Broadcast $ Array.singleton event)
+              let (interested :: Client) = unsafePartial $ fromJust $ Map.lookup interestedClientId clients
+              interested # Ws.transmit (Transmission.ToClient_Broadcast $ Array.singleton event)
 
     client # Ws.onClose do
       subsRef # Ref.modify_ (Relation.lexp clientId)
