@@ -12,6 +12,7 @@ import Data.Map (Map)
 import Data.Map as Map
 import Data.List (List)
 import Data.List as List
+import Data.Array as Array
 import Data.Set (Set)
 import Data.Set as Set
 import Data.Traversable (for_)
@@ -21,7 +22,7 @@ import Partial.Unsafe (unsafePartial)
 import Y.Shared.Id (Id)
 import Y.Shared.Id as Id
 import Y.Shared.Event (Event(..), EventPayload(..))
-import Y.Shared.Transmission (Transmission(..))
+import Y.Shared.Transmission as Transmission
 import Y.Shared.Config as Config
 
 import Y.Server.Util.Relation (Relation)
@@ -33,7 +34,7 @@ type Convo =
   , events :: List Event  -- expected to be sorted by time
   }
 
-type Client = Ws.Client Transmission (List Event)
+type Client = Ws.Client Transmission.ToServer Transmission.ToClient
 
 -- | Relates clients to the conversations that they are subscribed to
 type Subs = Relation (Id "Client") (Id "Convo")
@@ -90,16 +91,16 @@ main = do
       Left err -> Console.warn $ "Warning: transmission failed to decode; details:\n" <> err
       Right tn -> do
         case tn of
-          Transmission_Subscribe { userId, convoId } -> do
+          Transmission.ToServer_Subscribe { userId, convoId } -> do
             subsRef # Ref.modify_ (Relation.incl clientId convoId)
             userIdsRef # Ref.modify_ (Map.insert clientId userId)
 
-          Transmission_Pull { convoId } -> do
+          Transmission.ToServer_Pull { convoId } -> do
             convo <- convos_get convoId convosRef
-            let events = convo.events
-            client # Ws.transmit events
+            let events = Array.fromFoldable convo.events
+            client # Ws.transmit (Transmission.ToClient_Broadcast events)
 
-          Transmission_Push { convoId, event } -> do
+          Transmission.ToServer_Push { convoId, event } -> do
             -- v Log event
             convosRef # convos_modify convoId \convo -> convo { events = convo.events <> List.singleton event }
             -- v Notify interested clients
@@ -114,7 +115,7 @@ main = do
             for_ subbedClientIds \subbedClientId -> do
               clients <- Ref.read clientsRef
               let (subbed :: Client) = unsafePartial $ fromJust $ Map.lookup subbedClientId clients
-              subbed # Ws.transmit (List.singleton event)
+              subbed # Ws.transmit (Transmission.ToClient_Broadcast $ Array.singleton event)
 
     client # Ws.onClose do
       subsRef # Ref.modify_ (Relation.lexp clientId)

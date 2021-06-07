@@ -4,16 +4,11 @@ import Prelude
 
 import Effect (Effect)
 import Effect.Class (class MonadEffect)
-import Data.List (List)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Reader.Trans (ReaderT, runReaderT)
 import Control.Monad.Reader.Class (class MonadAsk, ask)
 
-import Y.Shared.Transmission (Transmission)
-import Y.Shared.Event (Event)
-
-import Y.Client.WebSocket as Ws
-import Y.Client.Core (Model)
+import Y.Client.Core (Model, Y_Ws_Client)
 
 newtype Action = Action (Model -> ActionMonad Model)
 
@@ -29,7 +24,7 @@ instance monoidAction :: Monoid Action where
 newtype ActionMonad a = ActionMonad (ReaderT ActionAnswer Effect a)
 
 type ActionAnswer =
-  { wsClient :: Ws.Client Transmission (List Event)
+  { wsClient :: Y_Ws_Client
   }
 
 runAction :: ActionAnswer -> Action -> (Model -> Effect Model)

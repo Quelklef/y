@@ -10,24 +10,30 @@ import Data.Argonaut.Decode.Generic (genericDecodeJson) as Agt
 import Y.Shared.Id (Id)
 import Y.Shared.Event (Event)
 
--- | Message from client to server
--- | Named "transmission" in order to reduce the number of things called "messages"
-data Transmission
+data ToServer
 
-  = Transmission_Subscribe
+  = ToServer_Subscribe
     { userId :: Id "User"  -- identity of subscribing client
     , convoId :: Id "Convo"
     }
 
-  | Transmission_Pull
+  | ToServer_Pull
     { convoId :: Id "Convo"
     }
 
-  | Transmission_Push
+  | ToServer_Push
     { convoId :: Id "Convo"
     , event :: Event
     }
 
-derive instance genericTransmission :: Generic Transmission _
-instance encodeJsonTransmission :: Agt.EncodeJson Transmission where encodeJson = Agt.genericEncodeJson
-instance decodeJsonTransmission :: Agt.DecodeJson Transmission where decodeJson = Agt.genericDecodeJson
+data ToClient
+
+  = ToClient_Broadcast (Array Event)
+
+derive instance genericToServer :: Generic ToServer _
+instance encodeJsonToServer :: Agt.EncodeJson ToServer where encodeJson = Agt.genericEncodeJson
+instance decodeJsonToServer :: Agt.DecodeJson ToServer where decodeJson = Agt.genericDecodeJson
+
+derive instance genericToClient :: Generic ToClient _
+instance encodeJsonToClient :: Agt.EncodeJson ToClient where encodeJson = Agt.genericEncodeJson
+instance decodeJsonToClient :: Agt.DecodeJson ToClient where decodeJson = Agt.genericDecodeJson

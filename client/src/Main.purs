@@ -4,7 +4,6 @@ import Prelude
 
 import Effect (Effect)
 import Effect.Console as Console
-import Data.List (List)
 import Data.Maybe (Maybe(..))
 import Data.Tuple.Nested ((/\))
 import Data.Foldable (fold)
@@ -12,12 +11,11 @@ import Effect.Class (liftEffect)
 
 import Y.Shared.Id (Id)
 import Y.Shared.Id as Id
-import Y.Shared.Event (Event)
-import Y.Shared.Transmission (Transmission(..))
+import Y.Shared.Transmission as Transmission
 import Y.Shared.Config as Config
 
 import Y.Client.App (runApp)
-import Y.Client.Core (mkInitialModel)
+import Y.Client.Core (mkInitialModel, Y_Ws_Client)
 import Y.Client.Action (Action(..), runAction)
 import Y.Client.Actions as Actions
 import Y.Client.View (view)
@@ -42,7 +40,7 @@ main = do
 
   -- Spin up websocket
   hostname <- getHostname
-  (wsClient :: Ws.Client Transmission (List Event))
+  (wsClient :: Y_Ws_Client)
     <- Ws.newConnection { url: "ws://" <> hostname <> ":" <> show Config.webSocketPort }
 
   -- apply hacky workaround regarding element focus
@@ -54,7 +52,7 @@ main = do
             # map case _ of
                 Nothing -> Action \model ->
                   model <$ liftEffect (Console.warn "Events list failed to parse; doing nothing")
-                Just events -> events # map Actions.fromEvent # fold
+                Just (Transmission.ToClient_Broadcast events) -> events # map Actions.fromEvent # fold
 
         , morallySubToSub screenDimsMorallySub
             # map \dims -> Action \model ->
@@ -72,5 +70,5 @@ main = do
   -- Kick the thing off!
   wsClient # Ws.onOpen do
     Console.log "WebSocket opened"
-    wsClient # Ws.transmit (Transmission_Subscribe { userId, convoId })
-    wsClient # Ws.transmit (Transmission_Pull { convoId })
+    wsClient # Ws.transmit (Transmission.ToServer_Subscribe { userId, convoId })
+    wsClient # Ws.transmit (Transmission.ToServer_Pull { convoId })

@@ -3,7 +3,6 @@ module Y.Client.Core where
 import Data.Set (Set)
 import Data.Set as Set
 import Data.Maybe (Maybe(..))
-import Data.List (List)
 import Data.List as List
 import Data.Map (Map)
 import Data.Map as Map
@@ -14,7 +13,11 @@ import Y.Client.Util.Sorted as Sorted
 import Y.Shared.Id (Id)
 import Y.Shared.Event (Event)
 import Y.Shared.Message (Message)
+import Y.Shared.Transmission as Transmission
 import Y.Client.Arrange as Arrange
+import Y.Client.WebSocket as Ws
+
+type Y_Ws_Client = Ws.Client Transmission.ToServer Transmission.ToClient
 
 type Model =
   { userId :: Id "User"

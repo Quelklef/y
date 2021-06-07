@@ -16,7 +16,7 @@ import Y.Shared.Util.Instant (getNow)
 import Y.Shared.Id (Id)
 import Y.Shared.Id as Id
 import Y.Shared.Event (Event(..), EventPayload(..))
-import Y.Shared.Transmission (Transmission(..))
+import Y.Shared.Transmission as Transmission
 
 import Y.Client.Util.Sorted as Sorted
 import Y.Client.Core (Model, Draft)
@@ -78,7 +78,7 @@ sendEvent event = Action \model -> do
 
   -- Send event to server
   let convoId = model.convoId
-  let transmission = Transmission_Push { convoId, event }
+  let transmission = Transmission.ToServer_Push { convoId, event }
   wsClient <- _.wsClient <$> ask
   liftEffect $ wsClient # Ws.transmit transmission
 
