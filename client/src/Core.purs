@@ -23,20 +23,20 @@ type Model =
   { userId :: Id "User"
   , convoId :: Id "Convo"
   , events :: Sorted Event
-  -- v "_r" = "redundant", computed from events
-  -- v TODO: having computed info in the model directly seems not ideal
-  -- v       it requires any caller which updates .events to also worry
-  -- v       about recomputing the other stuff
-  -- v       (Currently ok since .events is only changed in 1 location)
-  , userNames_r :: Map (Id "User") String
-  , messages_r :: Set Message
-  , unreadMessageIds_r :: Set (Id "Message")
   , drafts :: Set Draft
   , selectedIds :: Set (Id "Message")
   , focusedId :: Maybe (Id "Message")
   , arrangementAlgorithmKey :: String
   , nicknameInputValue :: Maybe String
   , screenDims :: { width :: Number, height :: Number }
+
+  -- v Redundant information derived from other model data
+  --   Kept in the model for efficieny's sake
+  --   Code that changes the model is expected to keep this
+  --   information up-to-date (sorry).
+  , userNames :: Map (Id "User") String
+  , messages :: Set Message
+  , unreadMessageIds :: Set (Id "Message")
   }
 
 mkInitialModel :: Id "User" -> Id "Convo" -> Model
@@ -44,15 +44,16 @@ mkInitialModel userId convoId =
   { userId: userId
   , convoId: convoId
   , events: Sorted.sort List.Nil
-  , userNames_r: Map.empty
-  , messages_r: Set.empty
-  , unreadMessageIds_r: Set.empty
   , drafts: Set.empty
   , selectedIds: Set.empty
   , focusedId: Nothing
   , arrangementAlgorithmKey: Arrange.defaultAlgoKey
   , nicknameInputValue: Nothing
   , screenDims: { width: 0.0, height: 0.0 }  -- will be set by a subscription
+
+  , userNames: Map.empty
+  , messages: Set.empty
+  , unreadMessageIds: Set.empty
   }
 
 type Draft =

@@ -94,7 +94,7 @@ view model = { head: headView, body: [bodyView] }
   where
 
   cards :: List Card
-  cards = ( Set.toUnfoldable $ (<>) (Set.map mkCard_Message model.messages_r) (Set.map mkCard_Draft model.drafts) )
+  cards = ( Set.toUnfoldable $ (<>) (Set.map mkCard_Message model.messages) (Set.map mkCard_Draft model.drafts) )
         # List.sortBy (comparing _.id)  -- shouldn't be required; is a workaround for ursi/purescript-elmish issue #5
 
   cardsById :: Map (Id "Message") Card
@@ -123,7 +123,7 @@ view model = { head: headView, body: [bodyView] }
   isSelected { id } = model.selectedIds # Set.member id
 
   isUnread :: Id "Message" -> Boolean
-  isUnread id = model.unreadMessageIds_r # Set.member id
+  isUnread id = model.unreadMessageIds # Set.member id
 
   isDraft :: Card -> Boolean
   isDraft card = case card.original of
@@ -158,7 +158,7 @@ view model = { head: headView, body: [bodyView] }
   getPosition id = positions # Map.lookup id
 
   getAuthorName :: Id "User" -> String
-  getAuthorName id = model.userNames_r # Map.lookup id # fromMaybe "<anonymous>"
+  getAuthorName id = model.userNames # Map.lookup id # fromMaybe "<anonymous>"
 
   getReplies :: Id "Message" -> Set Card
   getReplies = \id -> Map.lookup id mapping # fromMaybe Set.empty
@@ -471,7 +471,7 @@ view model = { head: headView, body: [bodyView] }
   viewUnreadMessageQueue =
     let
       unreadMessages =
-          model.unreadMessageIds_r
+          model.unreadMessageIds
           # (Set.toUnfoldable :: Set ~> Array)
           # (let redundant id = let depIds = (unsafeFromJust $ getCard id).depIds
                                 in depIds /= mempty && all isUnread depIds

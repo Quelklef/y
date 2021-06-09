@@ -46,19 +46,19 @@ fromEvent = \(Event event) -> Action \model -> pure $
   patch (Event event) model =
     case event.payload of
       EventPayload_SetName pl ->
-        model { userNames_r = model.userNames_r # Map.insert pl.userId pl.name }
+        model { userNames = model.userNames # Map.insert pl.userId pl.name }
 
       EventPayload_MessageSend pl ->
-        model { messages_r = model.messages_r <> Set.singleton pl.message
-              , unreadMessageIds_r =
+        model { messages = model.messages <> Set.singleton pl.message
+              , unreadMessageIds =
                   if pl.message.authorId == model.userId
-                  then model.unreadMessageIds_r
-                  else model.unreadMessageIds_r # Set.insert pl.message.id
+                  then model.unreadMessageIds
+                  else model.unreadMessageIds # Set.insert pl.message.id
               }
 
       EventPayload_SetReadState pl ->
-        model { unreadMessageIds_r =
-                  model.unreadMessageIds_r
+        model { unreadMessageIds =
+                  model.unreadMessageIds
                   # (if not pl.readState then Set.insert else Set.delete) pl.messageId
               }
 
@@ -66,9 +66,9 @@ fromEvent = \(Event event) -> Action \model -> pure $
   recompute model = model.events # foldl (flip patch) model0
     where
     model0 = model
-      { userNames_r = Map.empty
-      , messages_r = Set.empty
-      , unreadMessageIds_r = Set.empty
+      { userNames = Map.empty
+      , messages = Set.empty
+      , unreadMessageIds = Set.empty
       }
 
 sendEvent :: Event -> Action
