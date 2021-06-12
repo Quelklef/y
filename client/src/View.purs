@@ -304,6 +304,18 @@ view model = { head: headView, body: [bodyView] }
       [ viewArrangementAlgorithmPicker model.arrangementAlgorithmKey
       , viewNameChanger
       , viewUnreadMessageQueue
+      , H.pS
+          [ S.color "red"
+          , S.textAlign "right"
+          , S.lineHeight "1.6"
+          ]
+          [ ]
+          [ H.text "Note: Y is a work-in-progress."
+          , H.br []
+          , H.text "Data does not yet persist."
+          , H.br []
+          , H.text "Conversations can and will be deleted."
+          ]
       ]
     ]
 
