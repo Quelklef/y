@@ -10,4 +10,19 @@ purs-nix =
        }
     ) {};
 
-in { inherit purs-nix; }
+mk-shellhook = { dir }: ''
+    function y-workflow {
+      if ! [[ "$(pwd)" == */y/${dir} ]]; then
+        echo 1>&2 "Run in y/${dir}/"
+        return 1
+      fi
+
+      cd ..
+      git ls-files | grep -E '^(${dir}|shared)' | entr -cs 'cd ${dir} && purs-nix bundle && echo done'
+    }
+
+    # Personal thing
+    [[ $(type -t ps1_scope) == function ]] && ps1_scope "[y/${dir}] "
+  '';
+
+in { inherit purs-nix mk-shellhook; }

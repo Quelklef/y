@@ -2,13 +2,13 @@
 
 let
 
-inherit (import ../shared/nix.nix { inherit pkgs; }) purs-nix;
+shared = import ../shared/nix.nix { inherit pkgs; };
 
-nixed = purs-nix.purs
+nixed = shared.purs-nix.purs
   { srcs = [ ../client ../shared ];
     dependencies =
-      with purs-nix.ps-pkgs;
-      let ns = purs-nix.ps-pkgs-ns; in
+      with shared.purs-nix.ps-pkgs;
+      let ns = shared.purs-nix.ps-pkgs-ns; in
       [ console
         effect
         psci-support
@@ -63,6 +63,19 @@ in {
           srcs = [ "$PWD/../client" "$PWD/../shared" ];
         })
       ];
+
+    shellHook = ''
+      ${shared.mk-shellhook { dir = "client"; }}
+
+      function y-serve-client {
+        if ! [[ "$(pwd)" == */y/client ]]; then
+          echo >&2 "Run in y/client/"
+          return 1
+        fi
+
+        ${pkgs.python3}/bin/python -m http.server
+      }
+    '';
   };
 
 }

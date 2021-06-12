@@ -2,13 +2,13 @@
 
 let
 
-inherit (import ../shared/nix.nix { inherit pkgs; }) purs-nix;
+shared = import ../shared/nix.nix { inherit pkgs; };
 
-nixed = purs-nix.purs
+nixed = shared.purs-nix.purs
   { srcs = [ ../server ../shared ];
     dependencies =
-      with purs-nix.ps-pkgs;
-      let ns = purs-nix.ps-pkgs-ns; in
+      with shared.purs-nix.ps-pkgs;
+      let ns = shared.purs-nix.ps-pkgs-ns; in
       [ console
         effect
         psci-support
@@ -68,6 +68,18 @@ in {
         })
         pkgs.nodejs
       ];
+
+    shellHook = ''
+      ${shared.mk-shellhook { dir = "server"; }}
+
+      function y-run-server {
+        if ! [[ "$(pwd)" == *y/server ]]; then
+          echo >&2 "Run in y/server/"
+        fi
+
+        echo index.js | ${pkgs.entr}/bin/entr -c ${pkgs.nodejs}/bin/node index.js
+      }
+    '';
   };
 
 }
