@@ -37,6 +37,7 @@ nixed = shared.purs-nix.purs
         lazy
         node-fs
         stringutils
+        random
       ];
   };
 

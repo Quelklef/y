@@ -5,14 +5,20 @@ import Prelude
 import Data.Set (Set)
 import Data.Set as Set
 import Data.List as List
+import Data.Array as Array
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Map as Map
-import Data.Foldable (foldl)
+import Data.Int (floor)
+import Math as Math
+import Data.Foldable (foldl, foldMap)
+import Data.Monoid (power)
 import Effect (Effect)
 import Effect.Class (liftEffect)
+import Effect.Random (random)
 import Control.Monad.Reader.Class (ask)
 
 import Y.Shared.Util.Instant (getNow)
+import Y.Shared.Util.Instant as Instant
 import Y.Shared.Id (Id)
 import Y.Shared.Id as Id
 import Y.Shared.Event (Event(..), EventPayload(..))
@@ -193,3 +199,54 @@ setReadState messageId newReadState = Action \model -> do
 
   model' <- unAction (sendEvent event) model
   pure model'
+
+appendManyMessages :: Action
+appendManyMessages = appendRandomCard `power` 12
+  where
+  appendRandomCard = Action \model -> do
+    now1 <- liftEffect getNow
+    let now2 = Instant.fromMilliseconds $ Instant.asMilliseconds now1 + 1.0
+    userId <- liftEffect Id.new
+    eventId1 <- liftEffect Id.new
+    eventId2 <- liftEffect Id.new
+    messageId <- liftEffect Id.new
+
+    depCount <- liftEffect random <#> \x -> floor ((x `Math.pow` 3.0) * 4.0) + 1
+    shuffledMsgs <- liftEffect $ model.messages # Set.toUnfoldable # shuffle
+    let depIds = shuffledMsgs # Array.slice 0 depCount # map _.id # Set.fromFoldable
+
+    contentLength <- liftEffect random <#> \x -> floor (x * 50.0) + 5
+    let content = "x" `power` contentLength
+
+    let events =
+          [ Event
+            { id: eventId1
+            , time: now1
+            , payload: EventPayload_MessageSend
+              { convoId: model.convoId
+              , message:
+                { id: messageId
+                , timeSent: now1
+                , authorId: userId
+                , convoId: model.convoId
+                , depIds: depIds
+                , content: content
+                }
+              }
+            }
+          , Event
+            { id: eventId2
+            , time: now2
+            , payload: EventPayload_SetReadState
+              { convoId: model.convoId
+              , messageId: messageId
+              , userId: model.userId
+              , readState: true
+              }
+            }
+          ]
+
+    model' <- unAction (foldMap fromEvent events) model
+    pure $ model'
+
+foreign import shuffle :: forall a. Array a -> Effect (Array a)

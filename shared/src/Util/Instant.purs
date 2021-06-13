@@ -1,6 +1,7 @@
 module Y.Shared.Util.Instant
   ( Instant
   , getNow
+  , fromMilliseconds
   , asMilliseconds
   ) where
 
@@ -27,6 +28,9 @@ derive instance genericInstant :: Generic Instant _
 
 instance encodeJsonInstant :: Agt.EncodeJson Instant where encodeJson = Agt.genericEncodeJson
 instance decodeJsonInstant :: Agt.DecodeJson Instant where decodeJson = Agt.genericDecodeJson
+
+fromMilliseconds :: Number -> Instant
+fromMilliseconds ms = Instant { milliseconds: ms }
 
 asMilliseconds :: Instant -> Number
 asMilliseconds (Instant i) = i.milliseconds

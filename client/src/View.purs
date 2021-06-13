@@ -315,6 +315,9 @@ view model = { head: headView, body: [bodyView] }
           , H.br []
           , H.text "Conversations can and will be deleted."
           ]
+      , H.button
+        [ A.onClick Actions.appendManyMessages ]
+        [ H.text "big append (don't press this)" ]
       , viewUnreadMessageQueue
       ]
     ]
