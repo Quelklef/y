@@ -50,6 +50,7 @@ import Y.Client.Arrange (algorithms) as Arrange
 import Y.Client.ArrangementAlgorithms.Types (ArrangementAlgorithm(..)) as Arrange
 import Y.Client.CalcDims (calcDims)
 import Y.Client.Colors as Colors
+import Y.Client.TrivialProducer (trivialProducer)
 
 -- A card is a message or a draft plus computed info such as the shared fields
 -- The real solution here would be to use lenses
@@ -177,6 +178,9 @@ view model = { head: headView, body: [bodyView] }
                                    CardOriginal_Message m -> Map.singleton m.authorId (Instant.asMilliseconds m.timeSent)
                                    CardOriginal_Draft d -> Map.singleton model.userId infinity)
                                # foldl Map.union Map.empty  -- left-biased
+
+  onClick :: forall a. a -> A.Attribute a
+  onClick = A.onClick <<< trivialProducer
 
   headView :: Array (Html Action)
   headView =
@@ -351,7 +355,7 @@ view model = { head: headView, body: [bodyView] }
     , S.outline "none"
     ]
     [ guard (isSelected card) $ A.addClass "colorshift"
-    , A.onClick $ Actions.setFocused card.id
+    , onClick $ Actions.setFocused card.id
     ]
     [ case card.original of
         CardOriginal_Draft _ -> mempty
@@ -469,12 +473,12 @@ view model = { head: headView, body: [bodyView] }
       --         this codebase is behind an Elmish version or two anyway.
       , H.button
         [ guard (isNothing model.nicknameInputValue) $ A.disabled "disabled"
-        , A.onClick $ foldMap Actions.setName model.nicknameInputValue ]
+        , onClick $ foldMap Actions.setName model.nicknameInputValue ]
         [ H.text "update" ]
       , H.text " "
       , H.button
         [ guard (isNothing model.nicknameInputValue) $ A.disabled "disabled"
-        , A.onClick $ Action \m -> pure $ m { nicknameInputValue = Nothing }
+        , onClick $ Action \m -> pure $ m { nicknameInputValue = Nothing }
         ]
         [ H.text "cancel" ]
       ]

@@ -6,6 +6,7 @@ import Effect (Effect)
 import Effect.Uncurried (runEffectFn1)
 import Control.Monad.Trans.Class (lift)
 
+import RefEq (RefEq(RefEq))
 import Platform as Platform
 import Sub (Sub)
 import Html (Html)
