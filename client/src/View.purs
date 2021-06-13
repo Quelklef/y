@@ -303,7 +303,6 @@ view model = { head: headView, body: [bodyView] }
       [ ]
       [ viewArrangementAlgorithmPicker model.arrangementAlgorithmKey
       , viewNameChanger
-      , viewUnreadMessageQueue
       , H.pS
           [ S.color "red"
           , S.textAlign "right"
@@ -316,6 +315,7 @@ view model = { head: headView, body: [bodyView] }
           , H.br []
           , H.text "Conversations can and will be deleted."
           ]
+      , viewUnreadMessageQueue
       ]
     ]
 
