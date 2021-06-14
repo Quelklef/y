@@ -41,7 +41,7 @@ main = do
   -- Spin up websocket
   hostname <- getHostname
   (wsClient :: Y_Ws_Client)
-    <- Ws.newConnection { url: "ws://" <> hostname <> ":" <> show Config.webSocketPort }
+    <- Ws.newConnection { url: "wss://" <> hostname <> ":" <> show Config.webSocketPort }
 
   -- apply hacky workaround regarding element focus
   workaround_redirectFocusFromBodyToRoot
