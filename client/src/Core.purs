@@ -37,6 +37,7 @@ type Model =
   , userNames :: Map (Id "User") String
   , messages :: Set Message
   , unreadMessageIds :: Set (Id "Message")
+  , userIdToFirstEventTime :: Map (Id "User") Instant
   }
 
 mkInitialModel :: Id "User" -> Id "Convo" -> Model
@@ -54,6 +55,7 @@ mkInitialModel userId convoId =
   , userNames: Map.empty
   , messages: Set.empty
   , unreadMessageIds: Set.empty
+  , userIdToFirstEventTime: Map.empty
   }
 
 type Draft =

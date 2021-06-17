@@ -49,24 +49,34 @@ fromEvent = \(Event event) -> Action \model -> pure $
   where
 
   patch :: Event -> Model -> Model
-  patch (Event event) model =
-    case event.payload of
-      EventPayload_SetName pl ->
-        model { userNames = model.userNames # Map.insert pl.userId pl.name }
+  patch (Event event) = patch'firstEventTime >>> patch'eventSpecific
+    where
 
-      EventPayload_MessageSend pl ->
-        model { messages = model.messages <> Set.singleton pl.message
-              , unreadMessageIds =
-                  if pl.message.authorId == model.userId
-                  then model.unreadMessageIds
-                  else model.unreadMessageIds # Set.insert pl.message.id
-              }
+    patch'firstEventTime model =
+      let uid = case event.payload of
+            EventPayload_SetName { userId } -> userId
+            EventPayload_MessageSend { message: { authorId } } -> authorId
+            EventPayload_SetReadState { userId } -> userId
+      in model { userIdToFirstEventTime = model.userIdToFirstEventTime # Map.insert uid event.time }
 
-      EventPayload_SetReadState pl ->
-        model { unreadMessageIds =
-                  model.unreadMessageIds
-                  # (if not pl.readState then Set.insert else Set.delete) pl.messageId
-              }
+    patch'eventSpecific model =
+      case event.payload of
+        EventPayload_SetName pl ->
+          model { userNames = model.userNames # Map.insert pl.userId pl.name }
+
+        EventPayload_MessageSend pl ->
+          model { messages = model.messages <> Set.singleton pl.message
+                , unreadMessageIds =
+                    if pl.message.authorId == model.userId
+                    then model.unreadMessageIds
+                    else model.unreadMessageIds # Set.insert pl.message.id
+                }
+
+        EventPayload_SetReadState pl ->
+          model { unreadMessageIds =
+                    model.unreadMessageIds
+                    # (if not pl.readState then Set.insert else Set.delete) pl.messageId
+                }
 
   recompute :: Model -> Model
   recompute model = model.events # foldl (flip patch) model0
@@ -75,6 +85,7 @@ fromEvent = \(Event event) -> Action \model -> pure $
       { userNames = Map.empty
       , messages = Set.empty
       , unreadMessageIds = Set.empty
+      , userIdToFirstEventTime = Map.empty
       }
 
 sendEvent :: Event -> Action

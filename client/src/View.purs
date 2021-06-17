@@ -33,8 +33,7 @@ import Attribute as A
 import WHATWG.HTML.KeyboardEvent (toMaybeKeyboardEvent, shiftKey, key) as Wwg
 import WHATWG.DOM.Event (stopPropagation) as Wwg
 
-import Y.Shared.Util.Instant (Instant)
-import Y.Shared.Util.Instant as Instant
+import Y.Shared.Util.Instant (Instant, asMilliseconds)
 import Y.Shared.Message (Message)
 import Y.Shared.Id (Id)
 import Y.Shared.Id as Id
@@ -166,17 +165,20 @@ view model = { head: headView, body: [bodyView] }
                   # foldl (Map.unionWith Set.union) Map.empty
 
   getUserHue :: Id "User" -> Maybe Number
-  getUserHue id = List.findIndex (_ == id) userIdsChronologically # map (Colors.hueSeq seed)
+  getUserHue = \id -> Map.lookup id userIdToOrder # map (Colors.hueSeq seed)
     where
       seed = Id.format model.convoId
-      userIdsChronologically = Map.keys userIdToFirstMessageTime
-                             # Set.toUnfoldable
-                             # List.sortBy (comparing $ flip Map.lookup userIdToFirstMessageTime)
-      userIdToFirstMessageTime = cards
-                               # map (\card -> case card.original of
-                                   CardOriginal_Message m -> Map.singleton m.authorId (Instant.asMilliseconds m.timeSent)
-                                   CardOriginal_Draft d -> Map.singleton model.userId infinity)
-                               # foldl Map.union Map.empty  -- left-biased
+      userIdToOrder =
+        model.userIdToFirstEventTime
+        # map asMilliseconds
+        # flip Map.union (Map.singleton model.userId infinity)
+        -- ^ If this client's user has sent no messages, assign an infinite time
+        --   Note that 'flip Map.union' is right-biased
+        # Map.keys
+        # Set.toUnfoldable
+        # List.sortBy (comparing $ flip Map.lookup model.userIdToFirstEventTime)
+        # List.mapWithIndex (\idx userId -> Map.singleton userId idx)
+        # foldl Map.union Map.empty
 
   headView :: Array (Html Action)
   headView =
