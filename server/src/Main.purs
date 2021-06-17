@@ -23,10 +23,10 @@ import Y.Shared.Id (Id)
 import Y.Shared.Id as Id
 import Y.Shared.Event (Event(..), EventPayload(..))
 import Y.Shared.Transmission as Transmission
-import Y.Shared.Config as Config
 
 import Y.Server.Util.Relation (Relation)
 import Y.Server.Util.Relation as Relation
+import Y.Server.ServerConfig (getServerConfig, SslConfig(..))
 import Y.Server.WebSocket as Ws
 
 type Convo =
@@ -71,6 +71,8 @@ convos_modify convoId f convosRef = do
 main :: Effect Unit
 main = do
 
+  config <- getServerConfig
+
   Console.log "Running"
 
   subsRef <- Ref.new (Relation.empty :: Subs)
@@ -78,7 +80,10 @@ main = do
   clientsRef <- Ref.new (Map.empty :: Clients)
   userIdsRef <- Ref.new (Map.empty :: UserIds)
 
-  server <- Ws.newServer { port: Config.webSocketPort }
+  server <-
+    case config.sslConfig of
+      SslConfig_NoSsl -> Ws.newServer_http { port: 8081 }
+      SslConfig_UseSsl sslInfo -> Ws.newServer_https { port: 8081, sslInfo }
 
   server # Ws.onConnection \client -> do
 

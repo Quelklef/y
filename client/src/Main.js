@@ -1,7 +1,8 @@
-exports.getHostname =
+exports.getWsTarget =
 () =>
 {
-  return window.location.hostname;
+  const isHttps = [...window.location.protocol].reverse()[1] === 's';
+  return `${isHttps ? 'wss' : 'ws'}://${window.location.hostname}:8081`;
 };
 
 exports.initialize_f =

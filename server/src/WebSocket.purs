@@ -12,7 +12,8 @@ foreign import data Server :: Type -> Type -> Type
 foreign import data Client :: Type -> Type -> Type
 
 -- | Create a new server
-foreign import newServer :: forall ts tc. { port :: Int } -> Effect (Server ts tc)
+foreign import newServer_http :: forall ts tc. { port :: Int } -> Effect (Server ts tc)
+foreign import newServer_https :: forall ts tc. { port :: Int, sslInfo :: { cert :: String, key :: String } } -> Effect (Server ts tc)
 
 -- | Listen for new client connections
 foreign import onConnection :: forall ts tc. (Client ts tc -> Effect Unit) -> Server ts tc -> Effect Unit

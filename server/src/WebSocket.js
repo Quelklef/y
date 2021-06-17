@@ -1,7 +1,20 @@
 const WebSocket = require('ws');
+const https = require('https');
+const fs = require('fs');
 
-exports.newServer =
-({ port }) => () =>
+exports.newServer_https =
+({ sslInfo, port }) =>
+() =>
+{
+  const server = https.createServer({ cert: sslInfo.cert, key: sslInfo.key });
+  const wss = new WebSocket.Server({ server });
+  server.listen(port);
+  return wss;
+};
+
+exports.newServer_http =
+({ port }) =>
+() =>
 {
   return new WebSocket.Server({ port });
 };

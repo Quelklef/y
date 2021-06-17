@@ -77,6 +77,8 @@ in {
           echo >&2 "Run in y/server/"
         fi
 
+        # [ -e ./server.key -a -e ./server.key.pub ] || ssh-keygen -t rsa -N "" -f ./server.key
+
         echo index.js | ${pkgs.entr}/bin/entr -c ${pkgs.nodejs}/bin/node index.js
       }
     '';

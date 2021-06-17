@@ -12,7 +12,6 @@ import Effect.Class (liftEffect)
 import Y.Shared.Id (Id)
 import Y.Shared.Id as Id
 import Y.Shared.Transmission as Transmission
-import Y.Shared.Config as Config
 
 import Y.Client.App (runApp)
 import Y.Client.Core (mkInitialModel, Y_Ws_Client)
@@ -26,7 +25,7 @@ foreign import initialize_f :: forall a b r.
   (Id a -> Id b -> r) ->
   Id a -> Id b -> Effect r
 
-foreign import getHostname :: Effect String
+foreign import getWsTarget :: Effect String
 foreign import workaround_redirectFocusFromBodyToRoot :: Effect Unit
 foreign import screenDimsMorallySub :: MorallySub { width :: Number, height :: Number }
 
@@ -39,9 +38,8 @@ main = do
   let initialModel = mkInitialModel userId convoId
 
   -- Spin up websocket
-  hostname <- getHostname
-  (wsClient :: Y_Ws_Client)
-    <- Ws.newConnection { url: "wss://" <> hostname <> ":" <> show Config.webSocketPort }
+  wsTarget <- getWsTarget
+  (wsClient :: Y_Ws_Client) <- Ws.newConnection { url: wsTarget }
 
   -- apply hacky workaround regarding element focus
   workaround_redirectFocusFromBodyToRoot
