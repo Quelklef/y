@@ -44,3 +44,6 @@ angle (Vec2 v) = Math.atan2 v.y v.x
 
 scale :: Number -> Vec2 -> Vec2
 scale c (Vec2 v) = Vec2 { x: c * v.x, y: c * v.y }
+
+norm :: Vec2 -> Vec2
+norm v = scale (1.0 / mag v) v
