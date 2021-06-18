@@ -29,6 +29,7 @@ type Model =
   , arrangementAlgorithmKey :: String
   , nicknameInputValue :: Maybe String
   , screenDims :: { width :: Number, height :: Number }
+  , openContextMenuMessageId :: Maybe (Id "Message")
 
   -- v Redundant information derived from other model data
   --   Kept in the model for efficieny's sake
@@ -51,6 +52,7 @@ mkInitialModel userId convoId =
   , arrangementAlgorithmKey: Arrange.defaultAlgoKey
   , nicknameInputValue: Nothing
   , screenDims: { width: 0.0, height: 0.0 }  -- will be set by a subscription
+  , openContextMenuMessageId: Nothing
 
   , userNames: Map.empty
   , messages: Set.empty

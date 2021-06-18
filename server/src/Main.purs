@@ -115,6 +115,8 @@ main = do
                   case event of
                       Event { payload: EventPayload_SetName _ } -> subbedClientIds
                       Event { payload: EventPayload_MessageSend _ } -> subbedClientIds
+                      Event { payload: EventPayload_MessageEdit _ } -> subbedClientIds
+                      Event { payload: EventPayload_MessageDelete _ } -> subbedClientIds
                       Event { payload: EventPayload_SetReadState { userId } } ->
                         guard (clientUserId == Just userId) $ Set.singleton clientId
             for_ interestedClientIds \interestedClientId -> do

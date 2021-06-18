@@ -12,4 +12,5 @@ type Message =
   , convoId :: Id "Convo"
   , depIds :: Set (Id "Message")
   , content :: String
+  , deleted :: Boolean
   }

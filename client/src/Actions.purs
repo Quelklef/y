@@ -56,6 +56,8 @@ fromEvent = \(Event event) -> Action \model -> pure $
       let uid = case event.payload of
             EventPayload_SetName { userId } -> userId
             EventPayload_MessageSend { message: { authorId } } -> authorId
+            EventPayload_MessageEdit { authorId } -> authorId
+            EventPayload_MessageDelete { userId } -> userId
             EventPayload_SetReadState { userId } -> userId
       in model { userIdToFirstEventTime = model.userIdToFirstEventTime # Map.insert uid event.time }
 
@@ -70,6 +72,18 @@ fromEvent = \(Event event) -> Action \model -> pure $
                     if pl.message.authorId == model.userId
                     then model.unreadMessageIds
                     else model.unreadMessageIds # Set.insert pl.message.id
+                }
+
+        EventPayload_MessageEdit pl ->
+          model { messages = model.messages
+                           # Set.map (\msg -> if msg.id == pl.messageId then msg { content = pl.content } else msg)
+                }
+
+        EventPayload_MessageDelete pl ->
+          model { messages = model.messages
+                           # Set.map (\msg -> if msg.id == pl.messageId
+                                              then msg { content = "", deleted = true }
+                                              else msg)
                 }
 
         EventPayload_SetReadState pl ->
@@ -107,6 +121,13 @@ setFocused id = Action \model -> pure $ model { focusedId = Just id }
 setSelected :: Id "Message" -> Boolean -> Action
 setSelected id to = Action \model ->
   pure $ model { selectedIds = (if to then Set.insert else Set.delete) id model.selectedIds }
+
+toggleContextMenuFor :: Id "Message" -> Action
+toggleContextMenuFor targetId = Action \model ->
+  pure $ model { openContextMenuMessageId = case model.openContextMenuMessageId of
+    Nothing -> Just targetId
+    Just openId -> if openId == targetId then Nothing else Just targetId
+  }
 
 createDraft :: Action
 createDraft = Action \model -> do
@@ -172,6 +193,7 @@ sendMessage draft = Action \model -> do
         , convoId
         , depIds: draft.depIds
         , content: draft.content
+        , deleted: false
         }
 
   eventId <- liftEffect Id.new
@@ -211,6 +233,24 @@ setReadState messageId newReadState = Action \model -> do
   model' <- unAction (sendEvent event) model
   pure model'
 
+deleteMessage :: Id "Message" -> Action
+deleteMessage messageId = Action \model -> do
+  now <- liftEffect getNow
+  eventId <- liftEffect Id.new
+
+  let event = Event
+        { id: eventId
+        , time: now
+        , payload: EventPayload_MessageDelete
+          { convoId: model.convoId
+          , userId: model.userId
+          , messageId: messageId
+          }
+        }
+
+  model' <- unAction (sendEvent event) model
+  pure model'
+
 appendManyMessages :: Action
 appendManyMessages = appendRandomCard `power` 12
   where
@@ -242,6 +282,7 @@ appendManyMessages = appendRandomCard `power` 12
                 , convoId: model.convoId
                 , depIds: depIds
                 , content: content
+                , deleted: false
                 }
               }
             }

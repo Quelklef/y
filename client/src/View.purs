@@ -13,13 +13,11 @@ import Data.Maybe (Maybe(..), fromJust, fromMaybe, isNothing)
 import Data.Int as Int
 import Data.Number (infinity)
 import Data.Tuple.Nested ((/\))
-import Data.Foldable (fold, foldl, minimumBy, length, maximum, foldMap, all)
+import Data.Foldable (fold, foldl, minimumBy, length, foldMap, all)
 import Data.Newtype (unwrap)
 import Data.Generic.Rep (class Generic)
 import Data.Monoid (guard)
-import Data.String.CodeUnits (length) as String
-import Data.String.Common (trim, split) as String
-import Data.String.Pattern (Pattern(..)) as String
+import Data.String.Common (trim) as String
 import Data.Lazy as Lazy
 import Effect.Ref as Ref
 import Effect.Unsafe (unsafePerformEffect)
@@ -59,6 +57,7 @@ type Card =
   , depIds :: Set (Id "Message")
   , content :: String
   , time :: Instant  -- time created (draft) or sent (message)
+  , deleted :: Boolean
   }
 
 mkCard_Message :: Message -> Card
@@ -68,6 +67,7 @@ mkCard_Message m =
   , depIds: m.depIds
   , content: m.content
   , time: m.timeSent
+  , deleted: m.deleted
   }
 
 mkCard_Draft :: Draft -> Card
@@ -77,6 +77,7 @@ mkCard_Draft d =
   , depIds: d.depIds
   , content: d.content
   , time: d.timeCreated
+  , deleted: false
   }
 
 derive instance genericCardOriginal :: Generic CardOriginal _
@@ -207,6 +208,7 @@ view model = { head: headView, body: [bodyView] }
         , ".colorshift { animation: colorshift-anim 15s; animation-iteration-count: infinite; }"
         ]
       ]
+    , H.element "link" [ A.rel "stylesheet", A.href "https://fonts.googleapis.com/icon?family=Material+Icons" ] [ ]
     ]
 
   bodyView :: Html Action
@@ -348,11 +350,6 @@ view model = { head: headView, body: [bodyView] }
     , S.boxShadow $ "0 0 8px -2px " <> "hsla(" <> show (unsafeFromJust $ getUserHue $ getAuthorId card) <> " 100% 50% / 25%)"
     , S.fontFamily "sans-serif"
     , S.fontSize "13px"
-    , S.minWidth "18ch"
-    , S.maxWidth "35ch"
-    , S.width $ if isDraft card
-      then "100vw"  -- i.e., max-width
-      else (_ <> "ch") (card.content # String.split (String.Pattern "\n") # map String.length # maximum # fromMaybe 0 # show)
     , S.outline "none"
     ]
     [ guard (isSelected card) $ A.addClass "colorshift"
@@ -362,10 +359,10 @@ view model = { head: headView, body: [bodyView] }
         CardOriginal_Draft _ -> mempty
         CardOriginal_Message message ->
           H.divS
-          [ S.fontSize "0.75em"
-          , S.fontStyle "italic"
-          , S.marginBottom "0.5em"
+          [ S.marginBottom "0.5em"
           , S.paddingTop "1px"
+          , S.display "flex"
+          , S.alignItems "center"
           ]
           [ ]
           [ H.spanS
@@ -379,9 +376,54 @@ view model = { head: headView, body: [bodyView] }
             [ ]
             [ ]
           , H.spanS
-            [ S.opacity "0.5" ]
+            [ S.opacity "0.5"
+            , S.fontSize "0.75em"
+            , S.fontStyle "italic"
+            ]
             [ ]
             [ H.text $ message.authorId # getAuthorName ]
+          , H.spanS [ S.flex "1" ] [ ] [ ]
+          , let contextMenuIsOpen = model.openContextMenuMessageId == Just message.id in
+            guard (message.authorId == model.userId && not message.deleted) $
+            H.spanS
+            [ S.position "relative"  -- for absolutely-positioned child
+            ]
+            [ A.onClick $ Actions.toggleContextMenuFor card.id ]
+            [ H.spanS
+              [ S.fontSize "1em !important"  -- !important overrides font-size from .material-icons
+              , S.cursor "pointer"
+              , guard (not contextMenuIsOpen) $ S.opacity "0.25"
+              , S.hover [ S.opacity "1" ]
+              ]
+              [ A.addClass "material-icons" ]
+              [ H.text "more_vert" ]
+            , guard contextMenuIsOpen $
+              H.divS
+              [ S.display "flex"
+              , S.flexDirection "column"
+              , S.alignItems "stretch"
+              , S.position "absolute"
+              , S.top "0"
+              , S.left "calc(100% + 5px)"
+              , S.background "white"
+              , S.border "1px solid #C5C5C5"
+              , S.borderRadius "3px"
+              , S.fontSize "12px"
+              ]
+              [ ]
+              ( [ "Delete" /\ Actions.deleteMessage message.id
+                ]
+                # map \(text /\ action) ->
+                  H.divS
+                  [ S.cursor "pointer"
+                  , S.padding ".5em 1em"
+                  , S.hover [ S.background "rgba(0 0 0 / 5%)" ]
+                  , S.whiteSpace "pre"
+                  ]
+                  [ A.onClick action ]
+                  [ H.text text ]
+              )
+            ]
           ]
     , (if isDraft card then H.textareaS else H.divS)
       [ S.padding "0"
@@ -395,10 +437,8 @@ view model = { head: headView, body: [bodyView] }
       , S.color "inherit"
       , S.border $ if isDraft card then "1px solid lightgrey" else "none"
       , S.outline "none !important"
-      , guard (isDraft card) $ fold
-        [ S.height "5em"
-        , S.width "100%"
-        ]
+      , S.width "20ch"
+      , S.height if isDraft card then "5em" else "auto"
       ]
       [ A.id $ "textarea-for-" <> Id.format card.id  -- hack for being able to set focus on the textareas
       , A.value $ card.content
@@ -417,7 +457,10 @@ view model = { head: headView, body: [bodyView] }
             ]
           _ -> mempty
       ]
-      [ H.text $ card.content ]
+      [ if not card.deleted
+        then H.text $ card.content
+        else H.spanS [ S.fontStyle "italic", S.color "rgb(80 80 80)" ] [] [ H.text "(message deleted)" ]
+      ]
     ]
 
   viewArrow :: forall msg. { from :: Vec2, to :: Vec2 } -> Html msg

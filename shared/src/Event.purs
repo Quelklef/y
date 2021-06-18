@@ -36,12 +36,28 @@ data EventPayload
     , message :: Message
     }
 
+  -- A message was edited
+  | EventPayload_MessageEdit
+    { convoId :: Id "Convo"
+    , messageId :: Id "Message"
+    , authorId :: Id "User"
+    , content :: String
+    }
+
+  -- A message was deleted
+  | EventPayload_MessageDelete
+    { convoId :: Id "Convo"
+    , userId :: Id "User"
+    , messageId :: Id "Message"
+    }
+
+  -- A message was marked as read or unread
   | EventPayload_SetReadState
-   { convoId :: Id "Convo"
-   , userId :: Id "User"
-   , messageId :: Id "Message"
-   , readState :: Boolean
-   }
+    { convoId :: Id "Convo"
+    , userId :: Id "User"
+    , messageId :: Id "Message"
+    , readState :: Boolean
+    }
 
 derive instance eqEvent :: Eq Event
 derive instance genericEvent :: Generic Event _
