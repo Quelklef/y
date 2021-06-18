@@ -28,14 +28,14 @@ with-uglified = floc: deriv: pkgs.stdenv.mkDerivation {
   '';
 };
 
+y-version = import ./y-version.nix;
 y =
   if useLocalY
-  then ./.
+  then ./..
   else pkgs.fetchFromGitHub {
     owner = "quelklef";
     repo = "y";
-    rev = "487e8bb6221024d88a68b81555564d2d15803741";
-    sha256 = "1xhmawn8546f1lmdcizw4h291wy17dlrscqxcymfxvp0a8s02kjv";
+    inherit (y-version) rev sha256;
   };
 
 y-client = with-uglified "index.js" (import "${y}/client/default.nix" { inherit pkgs; });
@@ -79,6 +79,11 @@ in
           addSSL = true;
           enableACME = true;
           root = "${y-client}/";
+
+          locations."= /version".extraConfig = ''
+            return 200 '${y-version.rev}';
+            add_header Content-Type text/plain;
+          '';
         };
       };
 
