@@ -76,7 +76,7 @@ in
 
         virtualHosts.${hostname} = {
           default = true;
-          addSSL = true;
+          forceSSL = true;
           enableACME = true;
           root = "${y-client}/";
 
