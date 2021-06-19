@@ -1,6 +1,6 @@
 { pkgs ? import <nixpkgs> {}
 , toProd ? false
-, useLocalY ? false
+, y-version
 }:
 
 let
@@ -28,9 +28,8 @@ with-uglified = floc: deriv: pkgs.stdenv.mkDerivation {
   '';
 };
 
-y-version = import ./y-version.nix;
 y =
-  if useLocalY
+  if y-version == "use-local"
   then ./..
   else pkgs.fetchFromGitHub {
     owner = "quelklef";
@@ -81,7 +80,7 @@ in
           root = "${y-client}/";
 
           locations."= /version".extraConfig = ''
-            return 200 '${y-version.rev}';
+            return 200 '${if y-version == "use-local" then "working dir" else y-version.rev}';
             add_header Content-Type text/plain;
           '';
         };

@@ -1,4 +1,5 @@
 #!/bin/env bash
+set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")"
 
@@ -6,4 +7,4 @@ cd "$(dirname "${BASH_SOURCE[0]}")"
 
 rev=$(git rev-parse HEAD)
 sha256=$(nix-prefetch-git $(git config --get remote.origin.url) --rev $(git rev-parse HEAD) | jq .sha256 -r)
-echo "{ rev = \"$rev\"; sha256 = \"$sha256\"; }" > ./y-version.nix
+nixops set-args -d y --arg y-version "{ rev = \"$rev\"; sha256 = \"$sha256\"; }"
