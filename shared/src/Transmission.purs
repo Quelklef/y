@@ -14,15 +14,15 @@ data ToServer
 
   = ToServer_Subscribe
     { userId :: Id "User"  -- identity of subscribing client
-    , convoId :: Id "Convo"
+    , roomId :: Id "Room"
     }
 
   | ToServer_Pull
-    { convoId :: Id "Convo"
+    { roomId :: Id "Room"
     }
 
   | ToServer_Push
-    { convoId :: Id "Convo"
+    { roomId :: Id "Room"
     , event :: Event
     }
 

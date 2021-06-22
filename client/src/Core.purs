@@ -20,7 +20,7 @@ type Y_Ws_Client = Ws.Client Transmission.ToServer Transmission.ToClient
 
 type Model =
   { userId :: Id "User"
-  , convoId :: Id "Convo"
+  , roomId :: Id "Room"
   , events :: Sorted Event
   , drafts :: Set Draft
   , selectedIds :: Set (Id "Message")
@@ -49,10 +49,10 @@ type Message =
   , deleted :: Boolean
   }
 
-mkInitialModel :: Id "User" -> Id "Convo" -> Model
-mkInitialModel userId convoId =
+mkInitialModel :: Id "User" -> Id "Room" -> Model
+mkInitialModel userId roomId =
   { userId: userId
-  , convoId: convoId
+  , roomId: roomId
   , events: Sorted.sort List.Nil
   , drafts: Set.empty
   , selectedIds: Set.empty

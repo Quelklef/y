@@ -119,8 +119,8 @@ sendEvent event = Action \model -> do
   model' <- unAction (fromEvent event) model
 
   -- Send event to server
-  let convoId = model.convoId
-  let transmission = Transmission.ToServer_Push { convoId, event }
+  let roomId = model.roomId
+  let transmission = Transmission.ToServer_Push { roomId, event }
   wsClient <- _.wsClient <$> ask
   liftEffect $ wsClient # Ws.transmit transmission
 
@@ -198,7 +198,7 @@ sendMessage draft = Action \model -> do
   let event = Event
         { id: eventId
         , time: now
-        , convoId: model.convoId
+        , roomId: model.roomId
         , payload: EventPayload_MessageSend
           { messageId: draft.id
           , timeSent: now
@@ -213,12 +213,12 @@ sendMessage draft = Action \model -> do
 
 setName :: String -> Action
 setName newName = Action \model -> do
-  let convoId = model.convoId
+  let roomId = model.roomId
   let userId = model.userId
 
   now <- liftEffect getNow
   eventId <- liftEffect Id.new
-  let event = Event { id: eventId, time: now, convoId, payload: EventPayload_SetName {userId, name: newName } }
+  let event = Event { id: eventId, time: now, roomId, payload: EventPayload_SetName { userId, name: newName } }
   model' <- unAction (sendEvent event) model
 
   pure $ model' { nicknameInputValue = Nothing }
@@ -231,7 +231,7 @@ setIsUnread messageId isUnread = Action \model -> do
   let event = Event
         { id: eventId
         , time: now
-        , convoId: model.convoId
+        , roomId: model.roomId
         , payload: EventPayload_SetReadState
           { userId: model.userId
           , messageId: messageId
@@ -250,7 +250,7 @@ deleteMessage messageId = Action \model -> do
   let event = Event
         { id: eventId
         , time: now
-        , convoId: model.convoId
+        , roomId: model.roomId
         , payload: EventPayload_MessageDelete
           { userId: model.userId
           , messageId: messageId
@@ -282,7 +282,7 @@ appendManyMessages = appendRandomCard `power` 12
           [ Event
             { id: eventId1
             , time: now1
-            , convoId: model.convoId
+            , roomId: model.roomId
             , payload: EventPayload_MessageSend
               { messageId
               , timeSent: now1
@@ -294,7 +294,7 @@ appendManyMessages = appendRandomCard `power` 12
           , Event
             { id: eventId2
             , time: now2
-            , convoId: model.convoId
+            , roomId: model.roomId
             , payload: EventPayload_SetReadState
               { messageId: messageId
               , userId: model.userId

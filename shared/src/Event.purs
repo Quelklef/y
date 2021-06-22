@@ -20,7 +20,7 @@ newtype Event = Event
   { id :: Id "Event"
   , time :: Instant
   , payload :: EventPayload
-  , convoId :: Id "Convo"
+  , roomId :: Id "Room"
   }
 
 data EventPayload

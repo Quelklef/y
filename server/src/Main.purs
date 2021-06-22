@@ -29,44 +29,44 @@ import Y.Server.Util.Relation as Relation
 import Y.Server.ServerConfig (getServerConfig, SslConfig(..))
 import Y.Server.WebSocket as Ws
 
-type Convo =
-  { id :: Id "Convo"
+type Room =
+  { id :: Id "Room"
   , events :: List Event  -- expected to be sorted by time
   }
 
 type Client = Ws.Client Transmission.ToServer Transmission.ToClient
 
 -- | Relates clients to the conversations that they are subscribed to
-type Subs = Relation (Id "Client") (Id "Convo")
+type Subs = Relation (Id "Client") (Id "Room")
 
 -- | Keep track of...
-type Convos = Map (Id "Convo") Convo  -- ongoing conversations
+type Rooms = Map (Id "Room") Room  -- ongoing conversations
 type Clients = Map (Id "Client") Client  -- connected clients
 type UserIds = Map (Id "Client") (Id "User")  -- client user ids
 
 -- TODO: this setup is... ugly.
 
-_convos_ensureExists :: Id "Convo" -> Ref Convos -> Effect Unit
-_convos_ensureExists convoId convosRef = do
-  existing <- Ref.read convosRef <#> Map.lookup convoId
+_rooms_ensureExists :: Id "Room" -> Ref Rooms -> Effect Unit
+_rooms_ensureExists roomId roomsRef = do
+  existing <- Ref.read roomsRef <#> Map.lookup roomId
   case existing of
     Just _ -> pure unit
     Nothing -> do
-      let convo = { id: convoId, events: mempty }
-      convosRef # Ref.modify_ (Map.insert convo.id convo)
+      let room = { id: roomId, events: mempty }
+      roomsRef # Ref.modify_ (Map.insert room.id room)
       pure unit
 
-convos_get :: Id "Convo" -> Ref Convos -> Effect Convo
-convos_get convoId convosRef = do
-  _convos_ensureExists convoId convosRef
-  unsafePartial $ Ref.read convosRef <#> Map.lookup convoId >>> fromJust
+rooms_get :: Id "Room" -> Ref Rooms -> Effect Room
+rooms_get roomId roomsRef = do
+  _rooms_ensureExists roomId roomsRef
+  unsafePartial $ Ref.read roomsRef <#> Map.lookup roomId >>> fromJust
 
-convos_modify :: Id "Convo" -> (Convo -> Convo) -> Ref Convos -> Effect Unit
-convos_modify convoId f convosRef = do
-  _convos_ensureExists convoId convosRef
-  convosRef # Ref.modify_ \convos ->
-    let convo = unsafePartial $ Map.lookup convoId convos # fromJust
-    in Map.insert convoId (f convo) convos
+rooms_modify :: Id "Room" -> (Room -> Room) -> Ref Rooms -> Effect Unit
+rooms_modify roomId f roomsRef = do
+  _rooms_ensureExists roomId roomsRef
+  roomsRef # Ref.modify_ \rooms ->
+    let room = unsafePartial $ Map.lookup roomId rooms # fromJust
+    in Map.insert roomId (f room) rooms
 
 main :: Effect Unit
 main = do
@@ -76,7 +76,7 @@ main = do
   Console.log "Running"
 
   subsRef <- Ref.new (Relation.empty :: Subs)
-  convosRef <- Ref.new (Map.empty :: Convos)
+  roomsRef <- Ref.new (Map.empty :: Rooms)
   clientsRef <- Ref.new (Map.empty :: Clients)
   userIdsRef <- Ref.new (Map.empty :: UserIds)
 
@@ -96,20 +96,20 @@ main = do
       Left err -> Console.warn $ "Warning: transmission failed to decode; details:\n" <> err
       Right tn -> do
         case tn of
-          Transmission.ToServer_Subscribe { userId, convoId } -> do
-            subsRef # Ref.modify_ (Relation.incl clientId convoId)
+          Transmission.ToServer_Subscribe { userId, roomId } -> do
+            subsRef # Ref.modify_ (Relation.incl clientId roomId)
             userIdsRef # Ref.modify_ (Map.insert clientId userId)
 
-          Transmission.ToServer_Pull { convoId } -> do
-            convo <- convos_get convoId convosRef
-            let events = Array.fromFoldable convo.events
+          Transmission.ToServer_Pull { roomId } -> do
+            room <- rooms_get roomId roomsRef
+            let events = Array.fromFoldable room.events
             client # Ws.transmit (Transmission.ToClient_Broadcast events)
 
-          Transmission.ToServer_Push { convoId, event } -> do
+          Transmission.ToServer_Push { roomId, event } -> do
             -- v Log event
-            convosRef # convos_modify convoId \convo -> convo { events = convo.events <> List.singleton event }
+            roomsRef # rooms_modify roomId \room -> room { events = room.events <> List.singleton event }
             -- v Notify interested clients
-            subbedClientIds :: Set (Id "Client") <- Ref.read subsRef <#> Relation.rget convoId
+            subbedClientIds :: Set (Id "Client") <- Ref.read subsRef <#> Relation.rget roomId
             clientUserId <- Ref.read userIdsRef <#> Map.lookup clientId
             let (interestedClientIds :: Array (Id "Client")) = Set.toUnfoldable $
                   case event of

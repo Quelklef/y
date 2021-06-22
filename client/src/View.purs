@@ -167,7 +167,7 @@ view model = { head: headView, body: [bodyView] }
   getUserHue :: Id "User" -> Maybe Number
   getUserHue = \id -> Map.lookup id userIdToOrder # map (Colors.hueSeq seed)
     where
-      seed = Id.format model.convoId
+      seed = Id.format model.roomId
       userIdToOrder =
         model.userIdToFirstEventTime
         # map asMilliseconds

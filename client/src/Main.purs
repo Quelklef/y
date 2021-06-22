@@ -44,12 +44,12 @@ getUrlParams = getUrlParams_f (/\) Map.fromFoldable
 main :: Effect Unit
 main = do
 
-  convoId <- do
-    let key = "c"
+  roomId <- do
+    let key = "r"
     urlParams <- getUrlParams
     case Map.lookup key urlParams of
       Nothing -> do
-        (id :: Id "Convo") <- Id.new
+        (id :: Id "Room") <- Id.new
         appendUrlParam key (Id.format id)
       Just idStr -> case Id.parse idStr of
         Right id -> pure id
@@ -66,7 +66,7 @@ main = do
       Right id -> pure id
       Left _ -> throw "Corrupted localStorage"
 
-  let initialModel = mkInitialModel userId convoId
+  let initialModel = mkInitialModel userId roomId
 
   -- Spin up websocket
   wsTarget <- getWsTarget
@@ -99,5 +99,5 @@ main = do
   -- Kick the thing off!
   wsClient # Ws.onOpen do
     Console.log "WebSocket opened"
-    wsClient # Ws.transmit (Transmission.ToServer_Subscribe { userId, convoId })
-    wsClient # Ws.transmit (Transmission.ToServer_Pull { convoId })
+    wsClient # Ws.transmit (Transmission.ToServer_Subscribe { userId, roomId })
+    wsClient # Ws.transmit (Transmission.ToServer_Pull { roomId })
