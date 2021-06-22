@@ -1,43 +1,122 @@
-module Y.Shared.Id (Id, new, format, parse, isId) where
+module Y.Shared.Id (Id, new, format, parse) where
 
 import Prelude
 
 import Effect (Effect)
-
-import Data.Maybe (Maybe(..), isJust)
+import Effect.Unsafe (unsafePerformEffect)
+import Effect.Exception (throw)
+import Data.Maybe (Maybe(..), fromJust, fromMaybe)
+import Data.Either (Either(..), note)
+import Data.Array as Array
+import Data.Set as Set
+import Data.Tuple.Nested ((/\))
 import Data.Symbol (class IsSymbol, reflectSymbol, SProxy(..))
-import Data.String.Common (toLower)
+import Data.String.Common (toLower, split)
+import Data.String.CodeUnits (toCharArray)
+import Data.String.CodeUnits (length, slice, singleton) as String
+import Data.String.CodePoints (indexOf)
+import Data.String.Pattern (Pattern(..))
+import Data.Traversable (traverse)
+import Data.Foldable (foldl)
+import Partial.Unsafe (unsafePartial)
+import Data.Generic.Rep (class Generic)
 
 import Data.Argonaut.Encode (class EncodeJson, encodeJson) as Agt
 import Data.Argonaut.Decode (class DecodeJson, decodeJson) as Agt
 
-newtype Id (for :: Symbol) = Id String
+import Y.Shared.Util.BigInt (BigInt)
+import Y.Shared.Util.BigInt as BigInt
 
-derive instance eqId :: Eq (Id for)
-derive instance ordId :: Ord (Id for)
+-- | Characters used in IDs
+-- | Order is significant
+idCharSeq :: String
+idCharSeq = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
-instance encodeJsonId :: Agt.EncodeJson (Id for) where encodeJson = format >>> Agt.encodeJson
-instance decodeJsonId :: Agt.DecodeJson (Id for) where decodeJson = Agt.decodeJson >>> map Id
+-- | Characters allowed in namespaces
+-- | Order is significant
+nsAllowedCharSeq :: String
+nsAllowedCharSeq = "abcdefghijklmnopqrstuvwxyz-_ "
 
-_tagName :: forall for. IsSymbol for => SProxy for -> String
-_tagName proxy = reflectSymbol proxy # toLower
+fromDigits :: String -> String -> Maybe BigInt
+fromDigits digits =
+  toCharArray
+  >>> traverse (\ch -> indexOf (Pattern $ String.singleton ch) digits)
+  >>> map (map BigInt.fromInt)
+  >>> map (foldl (\acc digit -> acc * base + digit) zero)
+  where base = BigInt.fromInt $ String.length digits
 
-new :: forall for. IsSymbol for => Effect (Id for)
-new = new_f (_tagName (SProxy :: SProxy for))
+toDigits :: String -> BigInt -> String
+toDigits digits n =
+  let low = String.singleton $ unsafePartial $ fromJust $ Array.index (toCharArray digits) (BigInt.toInt $ n `mod` base)
+      rest = n `div` base
+      high = if rest > zero then toDigits digits rest else ""
+  in high <> low
+  where base = BigInt.fromInt $ String.length digits
 
-foreign import new_f :: forall for. String -> Effect (Id for)
+newtype AgtBigInt = AgtBigInt BigInt
 
-format :: forall for. Id for -> String
-format (Id s) = s
+derive instance genericAgtBigInt :: Generic AgtBigInt _
+
+instance encodeJsonAgtBigInt :: Agt.EncodeJson AgtBigInt
+  where encodeJson (AgtBigInt b) = Agt.encodeJson (BigInt.toNumber b)
+instance decodeJsonAgtBigInt :: Agt.DecodeJson AgtBigInt
+  where decodeJson = Agt.decodeJson >>> map (BigInt.fromNumber >>> fromMaybe zero >>> AgtBigInt)
+                                              -- TODO: fail on Nothing ^^
+
+newtype Id (namespace :: Symbol) = Id { time :: BigInt, rand :: BigInt }
+
+derive instance eqId :: Eq (Id ns)
+derive instance ordId :: Ord (Id ns)
+
+instance encodeJsonId :: IsSymbol ns => Agt.EncodeJson (Id ns)
+  where encodeJson (Id { time, rand }) = Agt.encodeJson (AgtBigInt time /\ AgtBigInt rand)
+instance decodeJsonId :: IsSymbol ns => Agt.DecodeJson (Id ns)
+  where decodeJson = Agt.decodeJson
+                 >>> map (\(AgtBigInt time /\ AgtBigInt rand) -> Id { time, rand })
+                 -- ^^ TODO: when decoding, fail on wrong namespace
+
+foreign import getNow :: Effect BigInt
+foreign import getRand :: BigInt -> Effect BigInt
+
+maxRand :: BigInt
+maxRand = BigInt.pow (BigInt.fromInt $ String.length idCharSeq) len - one
+  where len = BigInt.fromInt 4
+
+getNs :: forall ns. IsSymbol ns => SProxy ns -> Effect BigInt
+getNs proxy =
+  case reflectSymbol proxy of
+    "" -> throw "Invalid namespace: cannot be empty"
+    s -> case s # toLower # fromDigits nsAllowedCharSeq of
+      Nothing -> throw "Invalid namespace: contains invalid char"
+      Just n -> pure n
+
+-- | Generate a new identifier
+new :: forall ns. IsSymbol ns => Effect (Id ns)
+new = do
+  _ <- getNs (SProxy :: SProxy ns)
+  time <- getNow
+  rand <- getRand maxRand
+  pure $ Id { time, rand }
+
+  where toCharSet = toCharArray >>> Set.fromFoldable
+
+-- | Convert an identifier to a string
+format :: forall ns. IsSymbol ns => Id ns -> String
+format (Id id) =
+  let
+    ns = toDigits idCharSeq $ unsafePerformEffect $ getNs (SProxy :: SProxy ns)
+    ns0 = unsafePartial $ fromJust $ reflectSymbol (SProxy :: SProxy ns) # String.slice 0 1
+    timeStr = toDigits idCharSeq id.time
+    randStr = toDigits idCharSeq id.rand
+  in
+    ns0 <> "-" <> ns <> "-" <> timeStr <> "-" <> randStr
 
 -- | Parse an identifier
-parse :: forall for. IsSymbol for => String -> Maybe (Id for)
-parse id = parse_f Nothing Just (_tagName (SProxy :: SProxy for)) id
-
-foreign import parse_f :: forall for.
-  (forall a. Maybe a) -> (forall a. a -> Maybe a) ->
-  String -> String -> Maybe (Id for)
-
--- | @isId s@ is the same as @isJust (parse s)@
-isId :: forall for. IsSymbol for => String -> Boolean
-isId = map isJust (parse :: String -> Maybe (Id for))
+parse :: forall ns. IsSymbol ns => String -> Either String (Id ns)
+parse = split (Pattern "-") >>> case _ of
+  [ns0, ns, timeStr, randStr] -> do
+    when (ns /= (toDigits idCharSeq $ unsafePerformEffect $ getNs (SProxy :: SProxy ns))) $ Left "Wrong namespace"
+    time <- fromDigits idCharSeq timeStr # note "Invalid timestamp"
+    rand <- fromDigits idCharSeq randStr # note "Invalid random"
+    pure $ Id { time, rand }
+  _ -> Left "Wrong number of parts"

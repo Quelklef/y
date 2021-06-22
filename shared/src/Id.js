@@ -1,14 +1,13 @@
-exports.new_f = namespace => () => {
-  if (!(typeof namespace === 'string' && /^[a-zA-Z]+$/.test(namespace)))
-    throw Error('Namepsace must be string of 1 or more letters');
-  const time = Date.now() + '';
-  const rand = (Math.floor(Math.random() * 1e6) + '').padStart(6, '0')
-  return `y-${namespace}-${time}-${rand}`;
-}
-
-exports.parse_f = just => nothing => namespace => string => {
-  const formatOk = !!/^y-[a-zA-Z]+-[0-9]+-[0-9]{6}$/.test(string);
-  const namespaceOk = string.split('-') === namespace;
-  return formatOk && namespaceOk ? just(string) : nothing;
+exports.getNow =
+() =>
+{
+  return BigInt(Date.now());
 };
 
+exports.getRand =
+max =>
+() =>
+{
+  // NOTE: this will mangle high enough values of 'max'
+  return BigInt(Math.floor(Math.random() * Number(max)));
+};

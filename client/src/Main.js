@@ -5,19 +5,42 @@ exports.getWsTarget =
   return `${isHttps ? 'wss' : 'ws'}://${window.location.hostname}:8081`;
 };
 
-exports.initialize_f =
-mk2Tuple =>
-freshUid => freshCid =>
+exports.localStorage = {}
+
+exports.localStorage.has =
+key =>
 () =>
 {
-  let userId = localStorage.getItem('userId');
-  if (!userId) userId = freshUid
-  localStorage.setItem('userId', userId);
+  return localStorage.getItem(key) !== null;
+};
 
-  const convoId = new URL(window.location.href).searchParams.get('convo');
-  if (!convoId) window.location.href += '?convo=' + freshCid;
+exports.localStorage.get =
+key =>
+() =>
+{
+  return localStorage.getItem(key) || '';
+};
 
-  return mk2Tuple(userId)(convoId);
+exports.localStorage.set =
+key => val =>
+() =>
+{
+  localStorage.setItem(key, val);
+};
+
+exports.getUrlParams_f =
+mk2tuple => mapFromList =>
+() =>
+{
+  const params = Array.from(new URL(window.location.href).searchParams);
+  return mapFromList(params.map(([k, v]) => mk2tuple(k)(v)));
+};
+
+exports.appendUrlParam =
+key => val =>
+() =>
+{
+  window.location.href += '?' + key + '=' + val;
 };
 
 /* Sometimes, such as when the current document.activeElement is removed

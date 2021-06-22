@@ -3,9 +3,13 @@ module Main where
 import Prelude
 
 import Effect (Effect)
+import Effect.Exception (throw)
 import Effect.Console as Console
 import Data.Maybe (Maybe(..))
-import Data.Tuple.Nested ((/\))
+import Data.Either (Either(..))
+import Data.Map (Map)
+import Data.Map as Map
+import Data.Tuple.Nested (type (/\), (/\))
 import Data.Foldable (fold)
 import Effect.Class (liftEffect)
 
@@ -21,20 +25,47 @@ import Y.Client.View (view)
 import Y.Client.WebSocket as Ws
 import Y.Client.ToSub (websocketClientToSub, MorallySub, morallySubToSub)
 
-foreign import initialize_f :: forall a b r.
-  (Id a -> Id b -> r) ->
-  Id a -> Id b -> Effect r
-
+foreign import localStorage ::
+  { has :: String -> Effect Boolean
+  , get :: String -> Effect String
+  , set :: String -> String -> Effect Unit
+  }
+foreign import getUrlParams_f ::
+  (String -> String -> String /\ String) -> (Array (String /\ String) -> Map String String) ->
+  Effect (Map String String)
+foreign import appendUrlParam :: forall a. String -> String -> Effect a
 foreign import getWsTarget :: Effect String
 foreign import workaround_redirectFocusFromBodyToRoot :: Effect Unit
 foreign import screenDimsMorallySub :: MorallySub { width :: Number, height :: Number }
 
+getUrlParams :: Effect (Map String String)
+getUrlParams = getUrlParams_f (/\) Map.fromFoldable
+
 main :: Effect Unit
 main = do
 
-  -- Initialize state
-  freshUserId /\ freshConvoId <- (/\) <$> Id.new <*> Id.new
-  userId /\ convoId <- initialize_f (/\) freshUserId freshConvoId
+  convoId <- do
+    let key = "c"
+    urlParams <- getUrlParams
+    case Map.lookup key urlParams of
+      Nothing -> do
+        (id :: Id "Convo") <- Id.new
+        appendUrlParam key (Id.format id)
+      Just idStr -> case Id.parse idStr of
+        Right id -> pure id
+        Left _ -> throw "Bad URL params"
+
+  userId <- do
+    let key = "userId"
+    exists <- localStorage.has key
+    when (not $ exists) do
+      (id :: Id "User") <- Id.new
+      localStorage.set key (Id.format id)
+    idStr <- localStorage.get key
+    case Id.parse idStr of
+      Right id -> pure id
+      Left _ -> throw "Corrupted localStorage"
+
   let initialModel = mkInitialModel userId convoId
 
   -- Spin up websocket
