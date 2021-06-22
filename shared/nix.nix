@@ -17,8 +17,7 @@ mk-shellhook = { dir }: ''
         return 1
       fi
 
-      cd ..
-      git ls-files | grep -E '^(${dir}|shared)' | entr -cs 'cd ${dir} && purs-nix bundle && echo done'
+      ( cd .. && git ls-files | grep -E '^(${dir}|shared)' | entr -cs 'cd ${dir} && purs-nix bundle && echo done' )
     }
 
     # Personal thing

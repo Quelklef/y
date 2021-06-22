@@ -52,26 +52,37 @@ fromEvent = \(Event event) -> Action \model -> pure $
   patch (Event event) = patch'firstEventTime >>> patch'eventSpecific
     where
 
+    patch'firstEventTime :: Model -> Model
     patch'firstEventTime model =
       let uid = case event.payload of
             EventPayload_SetName { userId } -> userId
-            EventPayload_MessageSend { message: { authorId } } -> authorId
-            EventPayload_MessageEdit { authorId } -> authorId
+            EventPayload_MessageSend { userId } -> userId
+            EventPayload_MessageEdit { userId } -> userId
             EventPayload_MessageDelete { userId } -> userId
             EventPayload_SetReadState { userId } -> userId
       in model { userIdToFirstEventTime = model.userIdToFirstEventTime # Map.insert uid event.time }
 
+    patch'eventSpecific :: Model -> Model
     patch'eventSpecific model =
       case event.payload of
         EventPayload_SetName pl ->
           model { userNames = model.userNames # Map.insert pl.userId pl.name }
 
         EventPayload_MessageSend pl ->
-          model { messages = model.messages <> Set.singleton pl.message
+          model { messages =
+                    model.messages # Set.insert
+                      { id: pl.messageId
+                      , timeSent: pl.timeSent
+                      , authorId: pl.userId
+                      , depIds: pl.depIds
+                      , content: pl.content
+                      , deleted: false
+                      }
+
                 , unreadMessageIds =
-                    if pl.message.authorId == model.userId
+                    if pl.userId == model.userId
                     then model.unreadMessageIds
-                    else model.unreadMessageIds # Set.insert pl.message.id
+                    else model.unreadMessageIds # Set.insert pl.messageId
                 }
 
         EventPayload_MessageEdit pl ->
@@ -89,7 +100,7 @@ fromEvent = \(Event event) -> Action \model -> pure $
         EventPayload_SetReadState pl ->
           model { unreadMessageIds =
                     model.unreadMessageIds
-                    # (if not pl.readState then Set.insert else Set.delete) pl.messageId
+                    # (if pl.isUnread then Set.insert else Set.delete) pl.messageId
                 }
 
   recompute :: Model -> Model
@@ -183,21 +194,19 @@ editDraft draftId text = Action \model -> do
 sendMessage :: Draft -> Action
 sendMessage draft = Action \model -> do
   now <- liftEffect getNow
-
-  let convoId = model.convoId
-  let authorId = model.userId
-  let message =
-        { id: draft.id
-        , timeSent: now
-        , authorId
-        , convoId
-        , depIds: draft.depIds
-        , content: draft.content
-        , deleted: false
-        }
-
   eventId <- liftEffect Id.new
-  let event = Event { id: eventId, time: now, payload: EventPayload_MessageSend { convoId, message } }
+  let event = Event
+        { id: eventId
+        , time: now
+        , convoId: model.convoId
+        , payload: EventPayload_MessageSend
+          { messageId: draft.id
+          , timeSent: now
+          , userId: model.userId
+          , depIds: draft.depIds
+          , content: draft.content
+          }
+        }
   model' <- unAction (sendEvent event) model
 
   pure $ model' { drafts = model.drafts # Set.filter (\d -> d.id /= draft.id) }
@@ -209,24 +218,24 @@ setName newName = Action \model -> do
 
   now <- liftEffect getNow
   eventId <- liftEffect Id.new
-  let event = Event { id: eventId, time: now, payload: EventPayload_SetName { convoId, userId, name: newName } }
+  let event = Event { id: eventId, time: now, convoId, payload: EventPayload_SetName {userId, name: newName } }
   model' <- unAction (sendEvent event) model
 
   pure $ model' { nicknameInputValue = Nothing }
 
-setReadState :: Id "Message" -> Boolean -> Action
-setReadState messageId newReadState = Action \model -> do
+setIsUnread :: Id "Message" -> Boolean -> Action
+setIsUnread messageId isUnread = Action \model -> do
   now <- liftEffect getNow
   eventId <- liftEffect Id.new
 
   let event = Event
         { id: eventId
         , time: now
+        , convoId: model.convoId
         , payload: EventPayload_SetReadState
-          { convoId: model.convoId
-          , userId: model.userId
+          { userId: model.userId
           , messageId: messageId
-          , readState: newReadState
+          , isUnread
           }
         }
 
@@ -241,9 +250,9 @@ deleteMessage messageId = Action \model -> do
   let event = Event
         { id: eventId
         , time: now
+        , convoId: model.convoId
         , payload: EventPayload_MessageDelete
-          { convoId: model.convoId
-          , userId: model.userId
+          { userId: model.userId
           , messageId: messageId
           }
         }
@@ -273,27 +282,23 @@ appendManyMessages = appendRandomCard `power` 12
           [ Event
             { id: eventId1
             , time: now1
+            , convoId: model.convoId
             , payload: EventPayload_MessageSend
-              { convoId: model.convoId
-              , message:
-                { id: messageId
-                , timeSent: now1
-                , authorId: userId
-                , convoId: model.convoId
-                , depIds: depIds
-                , content: content
-                , deleted: false
-                }
+              { messageId
+              , timeSent: now1
+              , depIds: depIds
+              , content: content
+              , userId
               }
             }
           , Event
             { id: eventId2
             , time: now2
+            , convoId: model.convoId
             , payload: EventPayload_SetReadState
-              { convoId: model.convoId
-              , messageId: messageId
+              { messageId: messageId
               , userId: model.userId
-              , readState: true
+              , isUnread: false
               }
             }
           ]

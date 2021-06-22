@@ -32,7 +32,6 @@ import WHATWG.HTML.KeyboardEvent (toMaybeKeyboardEvent, shiftKey, key) as Wwg
 import WHATWG.DOM.Event (stopPropagation) as Wwg
 
 import Y.Shared.Util.Instant (Instant, asMilliseconds)
-import Y.Shared.Message (Message)
 import Y.Shared.Id (Id)
 import Y.Shared.Id as Id
 
@@ -40,7 +39,7 @@ import Y.Client.Util.Vec2 (Vec2)
 import Y.Client.Util.Vec2 as Vec2
 import Y.Client.Util.Memoize (memoize)
 import Y.Client.Util.Global (global)
-import Y.Client.Core (Model, Draft)
+import Y.Client.Core (Model, Draft, Message)
 import Y.Client.Action (Action(..))
 import Y.Client.Actions as Actions
 import Y.Client.Arrange (algorithms) as Arrange
@@ -244,7 +243,7 @@ view model = { head: headView, body: [bodyView] }
 
               -- Mark read/unread on R
               else if Wwg.key keyEvent == "r" then
-                Actions.setReadState focusedCard.id (isUnread focusedCard.id)
+                Actions.setIsUnread focusedCard.id (not $ isUnread focusedCard.id)
 
               -- arrow key controls
               else if Wwg.key keyEvent == "ArrowUp" then

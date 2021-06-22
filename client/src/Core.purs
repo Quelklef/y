@@ -12,7 +12,6 @@ import Y.Client.Util.Sorted (Sorted)
 import Y.Client.Util.Sorted as Sorted
 import Y.Shared.Id (Id)
 import Y.Shared.Event (Event)
-import Y.Shared.Message (Message)
 import Y.Shared.Transmission as Transmission
 import Y.Client.Arrange as Arrange
 import Y.Client.WebSocket as Ws
@@ -39,6 +38,15 @@ type Model =
   , messages :: Set Message
   , unreadMessageIds :: Set (Id "Message")
   , userIdToFirstEventTime :: Map (Id "User") Instant
+  }
+
+type Message =
+  { id :: Id "Message"
+  , timeSent :: Instant
+  , authorId :: Id "User"
+  , depIds :: Set (Id "Message")
+  , content :: String
+  , deleted :: Boolean
   }
 
 mkInitialModel :: Id "User" -> Id "Convo" -> Model

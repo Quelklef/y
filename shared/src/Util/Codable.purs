@@ -2,8 +2,8 @@ module Y.Shared.Util.Codable where
 
 import Prelude
 
-import Data.Maybe (Maybe)
 import Data.Either (Either, hush)
+import Data.Maybe (Maybe)
 import Data.Bifunctor (lmap)
 
 import Data.Argonaut.Encode (class EncodeJson, encodeJson)

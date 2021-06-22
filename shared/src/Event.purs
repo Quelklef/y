@@ -4,6 +4,7 @@ import Prelude
 
 import Data.Tuple.Nested ((/\))
 import Data.Generic.Rep (class Generic)
+import Data.Set (Set)
 
 import Data.Argonaut.Encode (class EncodeJson) as Agt
 import Data.Argonaut.Decode (class DecodeJson) as Agt
@@ -11,7 +12,6 @@ import Data.Argonaut.Encode.Generic (genericEncodeJson) as Agt
 import Data.Argonaut.Decode.Generic (genericDecodeJson) as Agt
 
 import Y.Shared.Util.Instant (Instant)
-import Y.Shared.Message (Message)
 import Y.Shared.Id (Id)
 
 -- An Event is "something that happening"
@@ -20,43 +20,43 @@ newtype Event = Event
   { id :: Id "Event"
   , time :: Instant
   , payload :: EventPayload
+  , convoId :: Id "Convo"
   }
 
 data EventPayload
   -- A user set their display name
   = EventPayload_SetName
-    { convoId :: Id "Convo"
+    { name :: String
     , userId :: Id "User"
-    , name :: String
     }
 
   -- A message was sent
   | EventPayload_MessageSend
-    { convoId :: Id "Convo"
-    , message :: Message
+    { messageId :: Id "Message"
+    , depIds :: Set (Id "Message")
+    , timeSent :: Instant
+    , content :: String
+    , userId :: Id "User"
     }
 
   -- A message was edited
   | EventPayload_MessageEdit
-    { convoId :: Id "Convo"
-    , messageId :: Id "Message"
-    , authorId :: Id "User"
+    { messageId :: Id "Message"
     , content :: String
+    , userId :: Id "User"
     }
 
   -- A message was deleted
   | EventPayload_MessageDelete
-    { convoId :: Id "Convo"
+    { messageId :: Id "Message"
     , userId :: Id "User"
-    , messageId :: Id "Message"
     }
 
   -- A message was marked as read or unread
   | EventPayload_SetReadState
-    { convoId :: Id "Convo"
+    { messageId :: Id "Message"
+    , isUnread :: Boolean
     , userId :: Id "User"
-    , messageId :: Id "Message"
-    , readState :: Boolean
     }
 
 derive instance eqEvent :: Eq Event
