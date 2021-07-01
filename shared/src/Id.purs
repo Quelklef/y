@@ -26,6 +26,7 @@ import Data.Argonaut.Decode (class DecodeJson, decodeJson) as Agt
 
 import Y.Shared.Util.BigInt (BigInt)
 import Y.Shared.Util.BigInt as BigInt
+import Y.Shared.ToFromPostgres as TFPg
 
 -- | Characters used in IDs
 -- | Order is significant
@@ -62,7 +63,6 @@ instance encodeJsonAgtBigInt :: Agt.EncodeJson AgtBigInt
 instance decodeJsonAgtBigInt :: Agt.DecodeJson AgtBigInt
   where decodeJson = Agt.decodeJson >>> map (BigInt.fromNumber >>> fromMaybe zero >>> AgtBigInt)
                                               -- TODO: fail on Nothing ^^
-
 newtype Id (namespace :: Symbol) = Id { time :: BigInt, rand :: BigInt }
 
 derive instance eqId :: Eq (Id ns)
@@ -120,3 +120,9 @@ parse = split (Pattern "-") >>> case _ of
     rand <- fromDigits idCharSeq randStr # note "Invalid random"
     pure $ Id { time, rand }
   _ -> Left "Wrong number of parts"
+
+instance toPg_Id :: IsSymbol ns => TFPg.ToPg (Id ns) where
+  toPg = format >>> TFPg.toPg
+
+instance fromPg_Id :: IsSymbol ns => TFPg.FromPg (Either String) (Id ns) where
+  fromPg = TFPg.fromPg >=> parse

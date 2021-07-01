@@ -12,15 +12,22 @@ import Y.Shared.Event (Event)
 
 data ToServer
 
-  = ToServer_Subscribe
-    { userId :: Id "User"  -- identity of subscribing client
-    , roomId :: Id "Room"
+  -- | Initialization message
+  = ToServer_Hello
+    { userId :: Id "User"  -- identity of client
     }
 
+  -- | Request realtime events for given room
+  | ToServer_Subscribe
+    { roomId :: Id "Room"
+    }
+
+  -- | Request existing events for given room
   | ToServer_Pull
     { roomId :: Id "Room"
     }
 
+  -- | Push an event to a room
   | ToServer_Push
     { roomId :: Id "Room"
     , event :: Event

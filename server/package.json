@@ -13,6 +13,7 @@
   "author": "Quelklef",
   "license": "UNLICENSED",
   "dependencies": {
+    "pg": "^8.6.0",
     "ws": "^7.4.5"
   }
 }

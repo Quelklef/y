@@ -31,7 +31,7 @@ import Attribute as A
 import WHATWG.HTML.KeyboardEvent (toMaybeKeyboardEvent, shiftKey, key) as Wwg
 import WHATWG.DOM.Event (stopPropagation) as Wwg
 
-import Y.Shared.Util.Instant (Instant, asMilliseconds)
+import Y.Shared.Instant (Instant, asMilliseconds)
 import Y.Shared.Id (Id)
 import Y.Shared.Id as Id
 
@@ -306,18 +306,6 @@ view model = { head: headView, body: [bodyView] }
       [ ]
       [ viewArrangementAlgorithmPicker model.arrangementAlgorithmKey
       , viewNameChanger
-      , H.pS
-          [ S.color "red"
-          , S.textAlign "right"
-          , S.lineHeight "1.6"
-          ]
-          [ ]
-          [ H.text "Note: Y is a work-in-progress."
-          , H.br []
-          , H.text "Data does not yet persist."
-          , H.br []
-          , H.text "Conversations can and will be deleted."
-          ]
       , H.button
         [ A.onClick Actions.appendManyMessages ]
         [ H.text "big append (don't press this)" ]

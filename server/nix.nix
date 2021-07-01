@@ -30,15 +30,22 @@ nixed = shared.purs-nix.purs
         arrays
         node-buffer
         ns.ursi.debug
+        aff
+        aff-promise
+        filterable
       ];
   };
 
-  # We have 1 node dependency
-  # I don't want to deal with node2nix or anything, so we'll handle it manually
-  node_ws = builtins.fetchTarball {
-    url = "https://registry.npmjs.org/ws/-/ws-7.4.6.tgz";
-    sha256 = "1xny147xgyqyghxcxgdvcm82fwkawlxc2qgcnvldcw4mcrdqdjqz";
-  };
+npmlock2nix =
+  let fetched = pkgs.fetchFromGitHub {
+        owner = "tweag";
+        repo = "npmlock2nix";
+        rev = "8ada8945e05b215f3fffbd10111f266ea70bb502";
+        sha256 = "0ni3z64wf1cha7xf5vqzqfqs73qc938zvnnbn147li1m4v8pnzzx";
+      };
+  in import fetched { inherit pkgs; };
+
+node_modules = npmlock2nix.node_modules { src = ./.; };
 
 in {
 
@@ -53,8 +60,8 @@ in {
 
       cp ${nixed.modules.Main.bundle {}} $out/index.js
 
-      mkdir -p $out/node_modules/ws
-      cp -r ${node_ws}/* $out/node_modules/ws
+      mkdir -p $out/node_modules/
+      cp -r ${node_modules}/node_modules $out/
 
       echo "${pkgs.nodejs}/bin/node $out/index.js" > $out/run.sh
       chmod +x $out/run.sh
@@ -67,20 +74,35 @@ in {
           srcs = [ "$PWD/../server" "$PWD/../shared" ];
         })
         pkgs.nodejs
+        pkgs.postgresql
       ];
 
     shellHook = ''
       ${shared.mk-shellhook { dir = "server"; }}
 
-      function y-run-server {
-        if ! [[ "$(pwd)" == *y/server ]]; then
-          echo >&2 "Run in y/server/"
-        fi
+      root=$PWD
 
-        # [ -e ./server.key -a -e ./server.key.pub ] || ssh-keygen -t rsa -N "" -f ./server.key
+      function y-run-server {(
+        cd "$root" && echo index.js | ${pkgs.entr}/bin/entr -c ${pkgs.nodejs}/bin/node --trace-uncaught index.js
+      )}
 
-        echo index.js | ${pkgs.entr}/bin/entr -c ${pkgs.nodejs}/bin/node index.js
+      function pg-init {
+        mkdir -p "$root"/pg/{cluster,socket}
+        initdb "$root"/pg/cluster
+        pg-start
+        createdb y
+        createuser y
       }
+      export PGDATA=$PWD/pg/cluster
+
+      function pg-start {
+        pg_ctl -l "$root"/pg/log -o "--unix_socket_directories='$root/pg/socket'" start
+        # stop with pg_ctl stop
+      }
+      export PGHOST=$root/pg/socket
+
+      export LC_ALL=C.UTF-8  # fix postgres
+      export Y_DB_CONNECTION_STRING="postgresql://y@localhost?host=$root/pg/socket"
     '';
   };
 

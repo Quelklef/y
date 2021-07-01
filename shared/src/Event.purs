@@ -11,7 +11,7 @@ import Data.Argonaut.Decode (class DecodeJson) as Agt
 import Data.Argonaut.Encode.Generic (genericEncodeJson) as Agt
 import Data.Argonaut.Decode.Generic (genericDecodeJson) as Agt
 
-import Y.Shared.Util.Instant (Instant)
+import Y.Shared.Instant (Instant)
 import Y.Shared.Id (Id)
 
 -- An Event is "something that happening"
@@ -53,7 +53,7 @@ data EventPayload
     }
 
   -- A message was marked as read or unread
-  | EventPayload_SetReadState
+  | EventPayload_MessageSetIsUnread
     { messageId :: Id "Message"
     , isUnread :: Boolean
     , userId :: Id "User"

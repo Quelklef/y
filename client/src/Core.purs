@@ -3,13 +3,13 @@ module Y.Client.Core where
 import Data.Set (Set)
 import Data.Set as Set
 import Data.Maybe (Maybe(..))
-import Data.List as List
+import Data.List (List)
 import Data.Map (Map)
 import Data.Map as Map
 
-import Y.Shared.Util.Instant (Instant)
-import Y.Client.Util.Sorted (Sorted)
-import Y.Client.Util.Sorted as Sorted
+import Y.Shared.Util.Sorted (Sorted)
+import Y.Shared.Util.Sorted as Sorted
+import Y.Shared.Instant (Instant)
 import Y.Shared.Id (Id)
 import Y.Shared.Event (Event)
 import Y.Shared.Transmission as Transmission
@@ -21,7 +21,7 @@ type Y_Ws_Client = Ws.Client Transmission.ToServer Transmission.ToClient
 type Model =
   { userId :: Id "User"
   , roomId :: Id "Room"
-  , events :: Sorted Event
+  , events :: Sorted List Event
   , drafts :: Set Draft
   , selectedIds :: Set (Id "Message")
   , focusedId :: Maybe (Id "Message")
@@ -53,7 +53,7 @@ mkInitialModel :: Id "User" -> Id "Room" -> Model
 mkInitialModel userId roomId =
   { userId: userId
   , roomId: roomId
-  , events: Sorted.sort List.Nil
+  , events: Sorted.empty
   , drafts: Set.empty
   , selectedIds: Set.empty
   , focusedId: Nothing

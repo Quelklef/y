@@ -1,4 +1,4 @@
-module Y.Server.Util.Env (getEnv, withDefault) where
+module Y.Server.Util.Env (getEnv, withDefault, required) where
 
 import Prelude
 
@@ -20,3 +20,8 @@ getEnv varname parse = do
 
 withDefault :: forall a. a -> (String -> Maybe a) -> (Maybe String -> Maybe a)
 withDefault default parse = map parse >>> fromMaybe (Just default)
+
+required :: forall a. (String -> Maybe a) -> (Maybe String -> Maybe a)
+required parse = case _ of
+  Just s -> parse s
+  Nothing -> Nothing

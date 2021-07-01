@@ -99,5 +99,6 @@ main = do
   -- Kick the thing off!
   wsClient # Ws.onOpen do
     Console.log "WebSocket opened"
-    wsClient # Ws.transmit (Transmission.ToServer_Subscribe { userId, roomId })
+    wsClient # Ws.transmit (Transmission.ToServer_Hello { userId })
+    wsClient # Ws.transmit (Transmission.ToServer_Subscribe { roomId })
     wsClient # Ws.transmit (Transmission.ToServer_Pull { roomId })

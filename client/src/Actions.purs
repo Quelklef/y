@@ -17,14 +17,14 @@ import Effect.Class (liftEffect)
 import Effect.Random (random)
 import Control.Monad.Reader.Class (ask)
 
-import Y.Shared.Util.Instant (getNow)
-import Y.Shared.Util.Instant as Instant
+import Y.Shared.Util.Sorted as Sorted
+import Y.Shared.Instant (getNow)
+import Y.Shared.Instant as Instant
 import Y.Shared.Id (Id)
 import Y.Shared.Id as Id
 import Y.Shared.Event (Event(..), EventPayload(..))
 import Y.Shared.Transmission as Transmission
 
-import Y.Client.Util.Sorted as Sorted
 import Y.Client.Core (Model, Draft)
 import Y.Client.Action (Action(..), unAction)
 import Y.Client.WebSocket as Ws
@@ -59,7 +59,7 @@ fromEvent = \(Event event) -> Action \model -> pure $
             EventPayload_MessageSend { userId } -> userId
             EventPayload_MessageEdit { userId } -> userId
             EventPayload_MessageDelete { userId } -> userId
-            EventPayload_SetReadState { userId } -> userId
+            EventPayload_MessageSetIsUnread { userId } -> userId
       in model { userIdToFirstEventTime = model.userIdToFirstEventTime # Map.insert uid event.time }
 
     patch'eventSpecific :: Model -> Model
@@ -97,7 +97,7 @@ fromEvent = \(Event event) -> Action \model -> pure $
                                               else msg)
                 }
 
-        EventPayload_SetReadState pl ->
+        EventPayload_MessageSetIsUnread pl ->
           model { unreadMessageIds =
                     model.unreadMessageIds
                     # (if pl.isUnread then Set.insert else Set.delete) pl.messageId
@@ -232,7 +232,7 @@ setIsUnread messageId isUnread = Action \model -> do
         { id: eventId
         , time: now
         , roomId: model.roomId
-        , payload: EventPayload_SetReadState
+        , payload: EventPayload_MessageSetIsUnread
           { userId: model.userId
           , messageId: messageId
           , isUnread
@@ -295,7 +295,7 @@ appendManyMessages = appendRandomCard `power` 12
             { id: eventId2
             , time: now2
             , roomId: model.roomId
-            , payload: EventPayload_SetReadState
+            , payload: EventPayload_MessageSetIsUnread
               { messageId: messageId
               , userId: model.userId
               , isUnread: false
