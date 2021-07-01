@@ -96,11 +96,27 @@ in
             set -euo pipefail
             export Y_SSL_CERT=$(cat /var/lib/acme/${hostname}/cert.pem)
             export Y_SSL_KEY=$(cat /var/lib/acme/${hostname}/key.pem)
+            export Y_DB_CONNECTION_STRING='postgresql://y:y@localhost'
             ${pkgs.nodejs}/bin/node ${y-server}/index.js
           '';
           Type = "simple";
           Restart = "always";
         };
+      };
+
+      services.postgresql = {
+        enable = true;
+        package = pkgs.postgresql;
+        enableTCPIP = false;
+        authentication = ''
+          local all all trust
+          host all all ::1/128 trust
+        '';
+        initialScript = pkgs.writeText "y-pg-init-script" ''
+          CREATE USER y WITH PASSWORD 'y';
+          CREATE DATABASE y;
+          GRANT ALL PRIVILEGES ON DATABASE y TO y;
+        '';
       };
 
       # for letsencrypt
