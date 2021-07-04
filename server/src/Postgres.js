@@ -36,7 +36,14 @@ async function()
   ());
 
   const result = await db.query(query);
-  return result.rows.map(row => row.map(mapField));
+
+  const rows = (
+    Array.isArray(result)
+      ? []  // Multiple statements executed, return nothing
+      : result.rows
+  );
+
+  return rows.map(row => row.map(mapField));
 
   function mapField(val) {
     if (val === null) return nullVal;
