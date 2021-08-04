@@ -101,6 +101,11 @@ in {
       }
       export PGHOST=$root/pg/socket
 
+      function pg-obliterate {
+        # Sometimes useful
+        ps -aux | grep postgres | awk '{ print $2 }' | xargs sudo kill -9
+      }
+
       export LC_ALL=C.UTF-8  # fix postgres
       export Y_DB_CONNECTION_STRING="postgresql://y@localhost?host=$root/pg/socket"
     '';

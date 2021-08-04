@@ -13,36 +13,44 @@ import Data.Traversable (traverse)
 
 import Y.Shared.ToFromPostgres (class ToPg, toPg, PgRetrievedVal(..), class FromPg, fromPg)
 
+-- | Provides ToPgRow and FromPgRow instances for fixed-width rows
+newtype Tup a = Tup a
+
+unTup :: forall a. Tup a -> a
+unTup (Tup a) = a
+
 class ToPgRow a where
   toPgRow :: a -> Array String
+
+instance toPgRow_rec :: (ToPg a, ToPg b, ToPgRow (Tup r)) => ToPgRow (Tup (a /\ (b /\ r))) where
+  toPgRow (Tup (a /\ (b /\ r))) = [toPg a, toPg b] <> toPgRow (Tup r)
+else instance toPgRow_base :: (ToPg a, ToPg b) => ToPgRow (Tup (a /\ b)) where
+  toPgRow (Tup (a /\ b)) = [toPg a, toPg b]
+else instance toPgRow_one :: ToPg a => ToPgRow (Tup a) where
+  toPgRow (Tup a) = [toPg a]
 
 class FromPgRow :: forall k. (k -> Type) -> k -> Constraint
 class FromPgRow m a where
   fromPgRow :: Array PgRetrievedVal -> m a
 
-instance toPgRow_rec :: (ToPg a, ToPg b, ToPgRow r) => ToPgRow (a /\ (b /\ r)) where
-  toPgRow (a /\ (b /\ r)) = [toPg a, toPg b] <> toPgRow r
-else instance toPgRow_base :: (ToPg a, ToPg b) => ToPgRow (a /\ b) where
-  toPgRow (a /\ b) = [toPg a, toPg b]
-else instance toPgRow_one :: ToPg a => ToPgRow a where
-  toPgRow a = [toPg a]
-
-instance fromPgRow_rec :: (MonadThrow String m, FromPg m a, FromPg m b, FromPgRow m r) => FromPgRow m (a /\ (b /\ r)) where
+instance fromPgRow_rec :: (MonadThrow String m, FromPg m a, FromPg m b, FromPgRow m (Tup r)) => FromPgRow m (Tup (a /\ (b /\ r))) where
   fromPgRow row =
     (do
       { head: a, tail: rest } <- Array.uncons row
       { head: b, tail: rest } <- Array.uncons rest
       pure $ a /\ b /\ rest)
     # case _ of
-      Just (a /\ b /\ rest) -> (\x y z -> x /\ y /\ z) <$> fromPg a <*> fromPg b <*> fromPgRow rest
+      Just (a /\ b /\ rest) -> map Tup $ (\x y z -> x /\ y /\ z) <$> fromPg a <*> fromPg b <*> (unTup <$> fromPgRow rest)
       Nothing -> throwError "Wrong number of results"
-else instance fromPgRow_base :: (MonadThrow String m, FromPg m a, FromPg m b) => FromPgRow m (a /\ b) where
+
+else instance fromPgRow_base :: (MonadThrow String m, FromPg m a, FromPg m b) => FromPgRow m (Tup (a /\ b)) where
   fromPgRow = case _ of
-    [a, b] -> (/\) <$> fromPg a <*> fromPg b
+    [a, b] -> map Tup $ (/\) <$> fromPg a <*> fromPg b
     _ -> throwError "Wrong number of results"
-else instance fromPgRow_one :: (MonadThrow String m, FromPg m a) => FromPgRow m a where
+
+else instance fromPgRow_one :: (MonadThrow String m, FromPg m a) => FromPgRow m (Tup a) where
   fromPgRow = case _ of
-    [a] -> fromPg a
+    [a] -> Tup <$> fromPg a
     _ -> throwError "Wrong number of results"
 
 foreign import data Database :: Type
@@ -50,6 +58,7 @@ foreign import new_f :: String -> Effect (Promise Database)
 foreign import query_f ::
   { nullVal :: PgRetrievedVal
   , arrayVal :: Array (PgRetrievedVal) -> PgRetrievedVal
+  , rowVal :: Array (PgRetrievedVal) -> PgRetrievedVal
   , otherVal :: String -> PgRetrievedVal
   , caseMaybeOf :: forall a r. Maybe a -> r -> (a -> r) -> r
   } ->
@@ -59,6 +68,7 @@ query :: Database -> String -> Maybe (Array String) -> Effect (Promise (Array (A
 query = query_f
   { nullVal: PgNull
   , arrayVal: PgArray
+  , rowVal: PgRow
   , otherVal: PgOther
   , caseMaybeOf: \maybe onNothing onJust -> maybe # map onJust # fromMaybe onNothing
   }

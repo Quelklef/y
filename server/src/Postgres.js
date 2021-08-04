@@ -22,7 +22,7 @@ async function()
 };
 
 exports.query_f =
-({ nullVal, arrayVal, otherVal, caseMaybeOf }) =>
+({ nullVal, arrayVal, rowVal, otherVal, caseMaybeOf }) =>
 db => sql => maybeVals =>
 async function()
 {
@@ -35,7 +35,11 @@ async function()
     (vals => () => query.values = vals)
   ());
 
+  console.log('Executing the following SQL:');
+  console.log(sql);
   const result = await db.query(query);
+  console.log('Result is:');
+  console.log(result.rows);
 
   const rows = (
     Array.isArray(result)
@@ -48,7 +52,17 @@ async function()
   function mapField(val) {
     if (val === null) return nullVal;
     if (Array.isArray(val)) return arrayVal(val.map(mapField));
-    if (typeof val !== 'string') throw Error('Value of unexpected type came from postgres');
+    if (typeof val === 'object' && 'f1' in val) {
+      // Allow returning rows with to_json
+      // TODO: This is a hack, as it is possible to return a json object
+      //       with an 'f1' field which does not represent a row.
+      //       The pg <-> postgres code needs to be redesigned as a whole!
+      return rowVal(Object.keys(val).sort((a, b) => a.localeCompare(b)).map(key => mapField(val[key])));
+    }
+    if (typeof val === 'boolean')
+      return otherVal(val ? 't' : 'f');  // TODO: also a hack to account for booleans in the to_json'd rows
+    if (typeof val !== 'string')
+      throw Error(`Value of unexpected type came from postgres: expected string, got ${typeof val}`);
     return otherVal(val);
   }
 };

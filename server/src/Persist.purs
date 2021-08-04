@@ -2,206 +2,214 @@ module Y.Server.Persist where
 
 import Prelude
 
-import Effect (Effect)
 import Effect.Aff (Aff)
 import Effect.Console as Console
 import Effect.Class (liftEffect)
-import Data.Tuple.Nested (type (/\), (/\))
-import Data.Maybe (Maybe(..))
-import Data.Either (Either(..))
+import Control.Monad.Error.Class (throwError)
+import Data.Tuple.Nested ((/\))
+import Data.Either (Either(..), note)
 import Data.Array as Array
-import Data.Set (Set)
-import Data.Traversable (traverse)
 
 import Y.Shared.Util.Sorted (Sorted)
 import Y.Shared.Util.Sorted as Sorted
-import Y.Shared.Instant (Instant)
 import Y.Shared.Event (Event(..), EventPayload(..))
 import Y.Shared.Id (Id)
+import Y.Shared.ToFromPostgres (PgRetrievedVal(..)) as Pg
 
 import Y.Server.ServerConfig (ServerConfig)
-import Y.Server.Postgres as Postgres
+import Y.Server.Postgres (class FromPgRow, class ToPgRow, Database, Tup(..), all, atomically, fromPgRow, new, run, run_) as Pg
 
-open :: ServerConfig -> Aff Postgres.Database
-open config = Postgres.new config.dbConnectionString
+open :: ServerConfig -> Aff Pg.Database
+open config = Pg.new config.dbConnectionString
 
-insertEvent :: Event -> Postgres.Database -> Aff Unit
+insertEvent :: Event -> Pg.Database -> Aff Unit
 insertEvent (Event event) db = case event.payload of
-  EventPayload_SetName pl -> db # Postgres.run
-    """
-      INSERT INTO events (id, time, roomId, kind, SetName_userId, SetName_name)
-      VALUES ($1, $2, $3, $4, $5, $6);
-    """
-    ( event.id /\ event.time /\ event.roomId /\ "SetName" /\ pl.userId /\ pl.name )
 
-  EventPayload_MessageSend pl -> db # Postgres.run
-    """
-      INSERT INTO events (id, time, roomId, kind, MessageSend_userId, MessageSend_messageId, MessageSend_depIds, MessageSend_timeSent, MessageSend_content)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);
-    """
-    ( event.id /\ event.time /\ event.roomId /\ "MessageSend" /\ pl.userId /\ pl.messageId /\ pl.depIds /\ pl.timeSent /\ pl.content )
+  EventPayload_SetName pl -> insertEvent_fromPayload "SetName"
+    "INSERT INTO EventPayload_SetName (userId, name) VALUES ($5, $6)"
+    ( pl.userId /\ pl.name )
 
-  EventPayload_MessageEdit pl -> db # Postgres.run
-    """
-      INSERT INTO events (id, time, roomId, kind, MessageEdit_userId, MessageEdit_messageId, MessageEdit_content)
-      VALUES ($1, $2, $3, $4, $5, $6, $7);
-    """
-    ( event.id /\ event.time /\ event.roomId /\ "MessageEdit" /\ pl.userId /\ pl.messageId /\ pl.content )
+  EventPayload_MessageSend pl -> insertEvent_fromPayload "MessageSend"
+    "INSERT INTO EventPayload_MessageSend (userId, messageId, depIds, timeSent, content) VALUES ($5, $6, $7, $8, $9)"
+    ( pl.userId /\ pl.messageId /\ pl.depIds /\ pl.timeSent /\ pl.content )
 
-  EventPayload_MessageDelete pl -> db # Postgres.run
-    """
-      INSERT INTO events (id, time, roomId, kind, MessageDelete_userId, MessageDelete_messageId)
-      VALUES ($1, $2, $3, $4, $5, $6);
-    """
-    ( event.id /\ event.time /\ event.roomId /\ "MessageDelete" /\ pl.userId /\ pl.messageId )
+  EventPayload_MessageEdit pl -> insertEvent_fromPayload "MessageEdit"
+    "INSERT INTO EventPayload_MessageEdit (userId, messageId, content) VALUES ($5, $6, $7)"
+    ( pl.userId /\ pl.messageId /\ pl.content )
 
-  EventPayload_MessageSetIsUnread pl -> db # Postgres.run
-    """
-      INSERT INTO events (id, time, roomId, kind, MessageSetIsUnread_userId, MessageSetIsUnread_messageId, MessageSetIsUnread_isUnread)
-      VALUES ($1, $2, $3, $4, $5, $6, $7);
-    """
-    ( event.id /\ event.time /\ event.roomId /\ "MessageSetIsUnread" /\ pl.userId /\ pl.messageId /\ pl.isUnread )
+  EventPayload_MessageDelete pl -> insertEvent_fromPayload "MessageDelete"
+    "INSERT INTO EventPayload_MessageDelete (userId, messageId) VALUES ($5, $6)"
+    ( pl.userId /\ pl.messageId )
 
-type EventRow =
-  (  Id "Event" /\ Instant /\ Id "Room" /\ String
-  /\ Maybe (Id "User") /\ Maybe String
-  /\ Maybe (Id "User") /\ Maybe (Id "Message") /\ Maybe (Set (Id "Message")) /\ Maybe Instant /\ Maybe String
-  /\ Maybe (Id "User") /\ Maybe (Id "Message") /\ Maybe String
-  /\ Maybe (Id "User") /\ Maybe (Id "Message")
-  /\ Maybe (Id "User") /\ Maybe (Id "Message") /\ Maybe Boolean
-  )
+  EventPayload_MessageSetIsUnread pl -> insertEvent_fromPayload "MessageSetIsUnread"
+    "INSERT INTO EventPayload_MessageSetIsUnread (userId, messageId, isUnread) VALUES ($5, $6, $7)"
+    ( pl.userId /\ pl.messageId /\ pl.isUnread )
 
-retrieveEvents :: Id "Room" -> Postgres.Database -> Aff (Sorted Array Event)
+  where
+
+  insertEvent_fromPayload :: forall r. Pg.ToPgRow (Pg.Tup r) => String -> String -> r -> Aff Unit
+  insertEvent_fromPayload payloadKind payloadInsertSql payloadRow =
+    db # Pg.run
+      ("""
+      WITH returned AS (
+        """ <> payloadInsertSql <> """
+        RETURNING pk
+      )
+      INSERT INTO Event (id, payloadPk, payloadKind, time, roomId)
+        SELECT $1, pk, $2, $3, $4 FROM returned
+      """)
+      ( Pg.Tup $ event.id /\ payloadKind /\ event.time /\ event.roomId /\ payloadRow )
+
+newtype RetrievedEvent = RetrievedEvent Event
+
+unRetrievedEvent :: RetrievedEvent -> Event
+unRetrievedEvent (RetrievedEvent event) = event
+
+instance instance_FromPgRow_RetrievedEvent :: Pg.FromPgRow (Either String) RetrievedEvent where
+  fromPgRow row = do
+
+    let eventStuff = Array.slice 0 4 row
+    payloadStuff <-
+      Array.index row 4
+      # note "Missing event payload"
+      >>= case _ of
+        Pg.PgRow ar -> pure ar
+        _ -> throwError "Expected array"
+
+    Pg.Tup (id /\ payloadKind /\ time /\ roomId) <- Pg.fromPgRow eventStuff
+
+    payload <- case payloadKind of
+      "SetName" -> do
+        Pg.Tup (userId /\ name) <- Pg.fromPgRow payloadStuff
+        pure $ EventPayload_SetName { userId, name }
+
+      "MessageSend" -> do
+        Pg.Tup (userId /\ messageId /\ depIds /\ timeSent /\ content) <- Pg.fromPgRow payloadStuff
+        pure $ EventPayload_MessageSend { userId, messageId, depIds, timeSent, content }
+
+      "MessageEdit" -> do
+        Pg.Tup (userId /\ messageId /\ content) <- Pg.fromPgRow payloadStuff
+        pure $ EventPayload_MessageEdit { userId, messageId, content }
+
+      "MessageDelete" -> do
+        Pg.Tup (userId /\ messageId) <- Pg.fromPgRow payloadStuff
+        pure $ EventPayload_MessageDelete { userId, messageId }
+
+      "MessageSetIsUnread" -> do
+        Pg.Tup (userId /\ messageId /\ isUnread) <- Pg.fromPgRow payloadStuff
+        pure $ EventPayload_MessageSetIsUnread { userId, messageId, isUnread }
+
+      _ -> do
+        throwError $ "Unrecognized payload kind: " <> payloadKind
+
+    pure $ RetrievedEvent $ Event { id, time, payload, roomId }
+
+retrieveEvents :: Id "Room" -> Pg.Database -> Aff (Sorted Array Event)
 retrieveEvents = \roomId db -> do
-  (maybeRows :: Either String (Array EventRow)) <- db # Postgres.all """
+  (maybeRetrievedEvents :: Either String (Array RetrievedEvent)) <- db # Pg.all """
     SELECT 
 
       id
+    , payloadKind
     , time
     , roomId
-    , kind
 
-    , SetName_userId
-    , SetName_name
+    , CASE
+        WHEN payloadKind = 'SetName'
+        THEN ( SELECT to_json((userId, name)) FROM EventPayload_SetName WHERE pk = payloadPk )
+          -- ^ to_json used to deal with the fact that the underlying js <-> pg lib
+          --   can't parse tuples :(
 
-    , MessageSend_userId
-    , MessageSend_messageId
-    , MessageSend_depIds
-    , MessageSend_timeSent
-    , MessageSend_content
+        WHEN payloadKind = 'MessageSend'
+        THEN ( SELECT to_json((userId, messageId, depIds, timeSent, content)) FROM EventPayload_MessageSend WHERE pk = payloadPk )
 
-    , MessageEdit_userId
-    , MessageEdit_messageId
-    , MessageEdit_content
+        WHEN payloadKind = 'MessageEdit'
+        THEN ( SELECT to_json((userId, messageId, content)) FROM EventPayload_MessageEdit WHERE pk = payloadPk )
 
-    , MessageDelete_userId
-    , MessageDelete_messageId
+        WHEN payloadKind = 'MessageDelete'
+        THEN ( SELECT to_json((userId, messageId)) FROM EventPayload_MessageDelete WHERE pk = payloadPk )
 
-    , MessageSetIsUnread_userId
-    , MessageSetIsUnread_messageId
-    , MessageSetIsUnread_isUnread
+        WHEN payloadKind = 'MessageSetIsUnread'
+        THEN ( SELECT to_json((userId, messageId, isUnread)) FROM EventPayload_MessageSetIsUnread WHERE pk = payloadPk )
+      END
 
-    FROM events
+    FROM Event
     WHERE roomId = $1
     ORDER BY time ASC;
-  """ roomId
+  """ (Pg.Tup roomId)
 
-  case maybeRows of
+  let maybeEvents = maybeRetrievedEvents # (map <<< map) unRetrievedEvent
+
+  case maybeEvents of
     Left err -> do
       liftEffect $ Console.warn $ "Failure when pulling from database: " <> err
       pure $ Sorted.empty
-    Right rows -> do
-      events <- rows # traverse (rowToEvent >>> liftEffect) # map Array.catMaybes
+    Right events -> do
       pure $ Sorted.fromAsc events
 
-rowToEvent :: EventRow -> Effect (Maybe Event)
-rowToEvent row = case row of
-  ( id /\ time /\ roomId /\ _ ) -> do
-    maybePayload <- rowToEventPayload row
-    let maybeEvent = maybePayload # map \payload -> Event { id, time, roomId, payload }
-    pure maybeEvent
-
-rowToEventPayload :: EventRow -> Effect (Maybe EventPayload)
-rowToEventPayload = case _ of
-
-  ( _ /\ _ /\ _ /\ "SetName"
-  /\ Just userId /\ Just name
-  /\ Nothing /\ Nothing /\ Nothing /\ Nothing /\ Nothing
-  /\ Nothing /\ Nothing /\ Nothing
-  /\ Nothing /\ Nothing
-  /\ Nothing /\ Nothing /\ Nothing
-  ) -> pure <<< Just $ EventPayload_SetName { userId, name }
-
-  ( _ /\ _ /\ _ /\ "MessageSend"
-  /\ Nothing /\ Nothing
-  /\ Just userId /\ Just messageId /\ Just depIds /\ Just timeSent /\ Just content
-  /\ Nothing /\ Nothing /\ Nothing
-  /\ Nothing /\ Nothing
-  /\ Nothing /\ Nothing /\ Nothing
-  ) -> pure <<< Just $ EventPayload_MessageSend { userId, messageId, depIds, timeSent, content }
-
-  ( _ /\ _ /\ _ /\ "MessageEdit"
-  /\ Nothing /\ Nothing
-  /\ Nothing /\ Nothing /\ Nothing /\ Nothing /\ Nothing
-  /\ Just userId /\ Just messageId /\ Just content
-  /\ Nothing /\ Nothing
-  /\ Nothing /\ Nothing /\ Nothing
-  ) -> pure <<< Just $ EventPayload_MessageEdit { userId, messageId, content }
-
-  ( _ /\ _ /\ _ /\ "MessageDelete"
-  /\ Nothing /\ Nothing
-  /\ Nothing /\ Nothing /\ Nothing /\ Nothing /\ Nothing
-  /\ Nothing /\ Nothing /\ Nothing
-  /\ Just userId /\ Just messageId
-  /\ Nothing /\ Nothing /\ Nothing
-  ) -> pure <<< Just $ EventPayload_MessageDelete { userId, messageId }
-
-  ( _ /\ _ /\ _ /\ "MessageSetIsUnread"
-  /\ Nothing /\ Nothing
-  /\ Nothing /\ Nothing /\ Nothing /\ Nothing /\ Nothing
-  /\ Nothing /\ Nothing /\ Nothing
-  /\ Nothing /\ Nothing
-  /\ Just userId /\ Just messageId /\ Just isUnread
-  ) -> pure <<< Just $ EventPayload_MessageSetIsUnread { userId, messageId, isUnread }
-
-  _ -> do
-    Console.warn "Failed to decode database row to event"
-    pure Nothing
-
-migrate :: ServerConfig -> Postgres.Database -> Aff Unit
+migrate :: ServerConfig -> Pg.Database -> Aff Unit
 migrate config db =
 
   -- TODO: instead of using IF NOT EXISTS, support a migrations folder
-  db # Postgres.atomically do
-    db # Postgres.run_ """
-      CREATE TABLE IF NOT EXISTS events
-        ( id     TEXT        NOT NULL
-        , time   TIMESTAMPTZ NOT NULL
-        , roomId TEXT        NOT NULL
-        , kind   TEXT        NOT NULL
-            CHECK(kind in ('SetName', 'MessageSend', 'MessageEdit', 'MessageDelete', 'MessageSetIsUnread'))
-
-        , SetName_userId TEXT                CHECK( (SetName_userId               IS NOT NULL) = (kind = 'SetName'           ) )
-        , SetName_name   TEXT                CHECK( (SetName_name                 IS NOT NULL) = (kind = 'SetName'           ) )
-
-        , MessageSend_userId    TEXT         CHECK( (MessageSend_userId           IS NOT NULL) = (kind = 'MessageSend'       ) )
-        , MessageSend_messageId TEXT         CHECK( (MessageSend_messageId        IS NOT NULL) = (kind = 'MessageSend'       ) )
-        , MessageSend_depIds    TEXT[]       CHECK( (MessageSend_depIds           IS NOT NULL) = (kind = 'MessageSend'       ) )
-        , MessageSend_timeSent  TIMESTAMPTZ  CHECK( (MessageSend_timeSent         IS NOT NULL) = (kind = 'MessageSend'       ) )
-        , MessageSend_content   TEXT         CHECK( (MessageSend_content          IS NOT NULL) = (kind = 'MessageSend'       ) )
-
-        , MessageEdit_userId    TEXT         CHECK( (MessageEdit_userId           IS NOT NULL) = (kind = 'MessageEdit'       ) )
-        , MessageEdit_messageId TEXT         CHECK( (MessageEdit_messageId        IS NOT NULL) = (kind = 'MessageEdit'       ) )
-        , MessageEdit_content   TEXT         CHECK( (MessageEdit_content          IS NOT NULL) = (kind = 'MessageEdit'       ) )
-
-        , MessageDelete_userId    TEXT       CHECK( (MessageDelete_userId         IS NOT NULL) = (kind = 'MessageDelete'     ) )
-        , MessageDelete_messageId TEXT       CHECK( (MessageDelete_messageId      IS NOT NULL) = (kind = 'MessageDelete'     ) )
-
-        , MessageSetIsUnread_userId    TEXT  CHECK( (MessageSetIsUnread_userId    IS NOT NULL) = (kind = 'MessageSetIsUnread') )
-        , MessageSetIsUnread_messageId TEXT  CHECK( (MessageSetIsUnread_messageId IS NOT NULL) = (kind = 'MessageSetIsUnread') )
-        , MessageSetIsUnread_isUnread  BOOL  CHECK( (MessageSetIsUnread_isUnread  IS NOT NULL) = (kind = 'MessageSetIsUnread') )
+  db # Pg.atomically do
+    db # Pg.run_ """
+      CREATE TABLE IF NOT EXISTS Event
+        ( id          TEXT        PRIMARY KEY
+        , payloadPk   INT         NOT NULL
+            -- ^ Reference to one of the EventPayload_* tables
+            --   Note that while events have 'id's, event payloads have 'pk's
+            --   This is to differentiate between identifiers which exist
+            --   only within the database (pks) from those which also exist
+            --   outside of the database (ids).
+        , payloadKind TEXT        NOT NULL
+            -- ^  Designates which EventPayload table payloadId references
+            CHECK(payloadKind in ('SetName', 'MessageSend', 'MessageEdit', 'MessageDelete', 'MessageSetIsUnread'))
+        , time        TIMESTAMPTZ NOT NULL
+        , roomId      TEXT        NOT NULL
         );
+
+      CREATE INDEX IF NOT EXISTS idx__Event__roomId ON Event (roomId);
+      CREATE INDEX IF NOT EXISTS idx__Event__time ON Event (time);
+      CREATE INDEX IF NOT EXISTS idx__Event__roomId_x_time ON Event (roomId, time);
+
+      CREATE TABLE IF NOT EXISTS EventPayload_SetName
+        ( pk     SERIAL PRIMARY KEY
+        , userId TEXT   NOT NULL
+        , name   TEXT   NOT NULL
+        );
+
+      CREATE TABLE IF NOT EXISTS EventPayload_MessageSend
+        ( pk        SERIAL      PRIMARY KEY
+        , userId    TEXT        NOT NULL
+        , messageId TEXT        NOT NULL
+        , depIds    TEXT[]      NOT NULL
+        , timeSent  TIMESTAMPTZ NOT NULL
+        , content   TEXT        NOT NULL
+        );
+
+      CREATE TABLE IF NOT EXISTS EventPayload_MessageEdit
+        ( pk        SERIAL PRIMARY KEY
+        , userId    TEXT   NOT NULL
+        , messageId TEXT   NOT NULL
+        , content   TEXT   NOT NULL
+        );
+
+      CREATE TABLE IF NOT EXISTS EventPayload_MessageDelete
+        ( pk        SERIAL PRIMARY KEY
+        , userId    TEXT   NOT NULL
+        , messageId TEXT   NOT NULL
+        );
+
+      CREATE TABLE IF NOT EXISTS EventPayload_MessageSetIsUnread
+        ( pk        SERIAL PRIMARY KEY
+        , userId    TEXT   NOT NULL
+        , messageId TEXT   NOT NULL
+        , isUnread  BOOL   NOT NULL
+        );
+
+      CREATE INDEX IF NOT EXISTS idx__EventPayload_SetName__pk            ON EventPayload_SetName (pk);
+      CREATE INDEX IF NOT EXISTS idx__EventPayload_MessageSend__pk        ON EventPayload_MessageSend (pk);
+      CREATE INDEX IF NOT EXISTS idx__EventPayload_MessageEdit__pk        ON EventPayload_MessageEdit (pk);
+      CREATE INDEX IF NOT EXISTS idx__EventPayload_MessageDelete__pk      ON EventPayload_MessageDelete (pk);
+      CREATE INDEX IF NOT EXISTS idx__EventPayload_MessageSetIsUnread__pk ON EventPayload_MessageSetIsUnread (pk);
     """
-    db # Postgres.run_ "CREATE INDEX IF NOT EXISTS events_roomId_idx ON events (roomId);"
-    db # Postgres.run_ "CREATE INDEX IF NOT EXISTS events_time_idx ON events (time);"
-    db # Postgres.run_ "CREATE INDEX IF NOT EXISTS events_roomId_time_idx ON events (roomId, time);"

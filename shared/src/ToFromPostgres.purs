@@ -59,8 +59,12 @@ instance toPg_Set :: (Ord a, ToPg a) => ToPg (Set a) where
 ------------
 -- FromPg --
 
--- Value returned by underlying js <-> pg lib
-data PgRetrievedVal = PgNull | PgArray (Array PgRetrievedVal) | PgOther String
+-- Value returned by underlying js <-> pg code
+data PgRetrievedVal
+  = PgNull
+  | PgArray (Array PgRetrievedVal)
+  | PgRow (Array PgRetrievedVal)
+  | PgOther String
 
 class FromPg :: forall k. (k -> Type) -> k -> Constraint
 class FromPg m a where
@@ -69,7 +73,8 @@ class FromPg m a where
 stringy :: forall m. MonadThrow String m => PgRetrievedVal -> m String
 stringy = case _ of
   PgNull -> throwError "Expected string value, not NULL"
-  PgArray a -> throwError "Expected string value, not array"
+  PgArray _ -> throwError "Expected string value, not array"
+  PgRow _ -> throwError "Expected string value, not row"
   PgOther s -> pure s
 
 instance fromPg_String :: MonadThrow String m => FromPg m String where
@@ -96,11 +101,13 @@ instance fromPg_Maybe :: (MonadThrow String m, FromPg m a) => FromPg m (Maybe a)
     PgNull -> pure Nothing
     PgArray a -> Just <$> fromPg (PgArray a)
     PgOther s -> Just <$> fromPg (PgOther s)
+    PgRow r -> Just <$> fromPg (PgRow r)
 
 instance fromPg_Array :: (MonadThrow String m, FromPg m a) => FromPg m (Array a) where
   fromPg = case _ of
     PgNull -> throwError "Expected array value, not NULL"
     PgOther s -> throwError $ "Expected array value, not: " <> show s
+    PgRow _ -> throwError $ "Expected array value, not row"
     PgArray vs -> traverse fromPg vs
 
 instance fromPg_Set :: (Ord a, MonadThrow String m, FromPg m a) => FromPg m (Set a) where
