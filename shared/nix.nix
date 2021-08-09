@@ -11,7 +11,7 @@ purs-nix =
     ) {};
 
 mk-shellhook = { dir }: ''
-    function y-workflow {
+    function y.workflow {
       if ! [[ "$(pwd)" == */y/${dir} ]]; then
         echo 1>&2 "Run in y/${dir}/"
         return 1

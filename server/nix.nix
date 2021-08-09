@@ -82,11 +82,11 @@ in {
 
       root=$PWD
 
-      function y-run-server {(
+      function y.run-server {(
         cd "$root" && echo index.js | ${pkgs.entr}/bin/entr -c ${pkgs.nodejs}/bin/node --trace-uncaught index.js
       )}
 
-      function pg-init {
+      function y.pg-init {
         mkdir -p "$root"/pg/{cluster,socket}
         initdb "$root"/pg/cluster
         pg-start
@@ -95,13 +95,13 @@ in {
       }
       export PGDATA=$PWD/pg/cluster
 
-      function pg-start {
+      function y.pg-start {
         pg_ctl -l "$root"/pg/log -o "--unix_socket_directories='$root/pg/socket'" start
         # stop with pg_ctl stop
       }
       export PGHOST=$root/pg/socket
 
-      function pg-obliterate {
+      function y.pg-obliterate {
         # Sometimes useful
         ps -aux | grep postgres | awk '{ print $2 }' | xargs sudo kill -9
       }

@@ -68,7 +68,7 @@ in {
     shellHook = ''
       ${shared.mk-shellhook { dir = "client"; }}
 
-      function y-serve-client {
+      function y.serve-client {
         if ! [[ "$(pwd)" == */y/client ]]; then
           echo >&2 "Run in y/client/"
           return 1
