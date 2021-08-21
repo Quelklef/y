@@ -1,16 +1,11 @@
 const pg = require('pg');
 
-// Remove the default behaviour to parse some types into rich objects
-// We keep two things:
-// 1) representing PG NULL as JS null, to distinguish null from "null"
-// 2) PG arrays being represented as JS arrays, because there doesn't seem
-//    to be any way to disable this.
-//    (Doing it this way is also slightly simpler, I think)
-const id = x => x;
-pg.types.setTypeParser(pg.types.builtins.DATE, id);
-pg.types.setTypeParser(pg.types.builtins.TIMESTAMPTZ, id);
-pg.types.setTypeParser(pg.types.builtins.TIMESTAMP, id);
-pg.types.setTypeParser(pg.types.builtins.BOOL, id);
+// Suppress node-postgres parsing values in retrieved rows
+// This relies on implementation details of node-postgres
+pg.types.getTypeParser = () => x => x;
+
+// As it turns out, formatting of inserted rows doesn't also need to be disabled
+// We can just pass PostgreSQL expressions as strings and it'll work
 
 exports.new_f =
 connectionString =>
@@ -22,47 +17,41 @@ async function()
 };
 
 exports.query_f =
-({ nullVal, arrayVal, rowVal, otherVal, caseMaybeOf }) =>
-db => sql => maybeVals =>
+({ db, sql, params }) =>
 async function()
 {
   let query = { text: sql, rowMode: 'array' };
 
-  (caseMaybeOf(maybeVals)
-    // v Nothing
-    (() => {})
-    // v Just vals
-    (vals => () => query.values = vals)
-  ());
+  if (params.length)
+    query.values = params;
 
-  console.log('Executing the following SQL:');
-  console.log(sql);
-  const result = await db.query(query);
-  console.log('Result is:');
-  console.log(result.rows);
+  console.log('Executing the following SQL:\n' + sql);
 
-  const rows = (
-    Array.isArray(result)
-      ? []  // Multiple statements executed, return nothing
-      : result.rows
-  );
+  // v TODO: catch{} into monad
+  const returned = await db.query(query);
 
-  return rows.map(row => row.map(mapField));
+  let rows;
 
-  function mapField(val) {
-    if (val === null) return nullVal;
-    if (Array.isArray(val)) return arrayVal(val.map(mapField));
-    if (typeof val === 'object' && 'f1' in val) {
-      // Allow returning rows with to_json
-      // TODO: This is a hack, as it is possible to return a json object
-      //       with an 'f1' field which does not represent a row.
-      //       The pg <-> postgres code needs to be redesigned as a whole!
-      return rowVal(Object.keys(val).sort((a, b) => a.localeCompare(b)).map(key => mapField(val[key])));
-    }
-    if (typeof val === 'boolean')
-      return otherVal(val ? 't' : 'f');  // TODO: also a hack to account for booleans in the to_json'd rows
-    if (typeof val !== 'string')
-      throw Error(`Value of unexpected type came from postgres: expected string, got ${typeof val}`);
-    return otherVal(val);
-  }
+  // If the SQL had only one statement, then the result will be an object.
+  // If it had multiple, the result will be an array of objects.
+  // In the case of multiple statements, pretend like no rows were returned.
+  rows = Array.isArray(returned) ? [] : returned.rows;
+
+  // Transform rows from string[][] to a expr[]
+  // This means that some consumption code only has to account for handling
+  // expressions rather than expressions and expression arrays.
+  rows = rows.map(row => printComposite(row, "(,)"));
+
+  return rows;
 };
+
+function printComposite(arr, chars) {
+  const [open, delim, close] = [...chars];
+  return open + arr.map(escape).join(delim) + close;
+
+  function escape(str) {
+    const special = new Set([open, delim, close, '\\', '"']);
+    const ok = [...special].every(char => !str.includes(char));
+    return ok ? str : '"' + [...str].map(ch => special.has(ch) ? '\\' + ch : ch).join('') + '"';
+  }
+}

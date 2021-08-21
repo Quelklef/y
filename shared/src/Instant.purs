@@ -8,8 +8,6 @@ module Y.Shared.Instant
 import Prelude
 
 import Effect (Effect)
-import Data.Int as Int
-import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.Generic.Rep (class Generic)
 import Data.Argonaut.Encode (class EncodeJson) as Agt
@@ -17,7 +15,10 @@ import Data.Argonaut.Decode (class DecodeJson) as Agt
 import Data.Argonaut.Encode.Generic (genericEncodeJson) as Agt
 import Data.Argonaut.Decode.Generic (genericDecodeJson) as Agt
 
-import Y.Shared.ToFromPostgres as TFPg
+import Y.Shared.Util.MonadJuggle (class MonadJuggle, juggle)
+import Y.Shared.Pg.ToPg (class ToPg) as Pg
+import Y.Shared.Pg.FromPg (class FromPg, mkImpl) as Pg
+import Y.Shared.Pg.Types (PgExpr(..)) as Pg
 
 newtype Instant = Instant { milliseconds :: Number }
 
@@ -46,18 +47,18 @@ fromSeconds = (_ * 1000.0) >>> fromMilliseconds
 asSeconds :: Instant -> Number
 asSeconds = asMilliseconds >>> (_ / 1000.0)
 
-instance toPg_Instant :: TFPg.ToPg Instant where
-  toPg = asMilliseconds >>> millisecondsToPgTimestamptz
+instance toPg_Instant :: Pg.ToPg Instant where
+  toPg = asMilliseconds >>> millisecondsToPgTimestamptz >>> Pg.PgExpr
 
-instance fromPg_Instant :: TFPg.FromPg (Either String) Instant where
-  fromPg = TFPg.fromPg >=> pgTimestamptzToMilliseconds >>> map fromMilliseconds
+instance fromPg_Instant :: Pg.FromPg Instant where
+  impl = Pg.mkImpl $ pgTimestamptzToMilliseconds >>> map fromMilliseconds
 
-pgTimestamptzToMilliseconds :: String -> Either String Number
+pgTimestamptzToMilliseconds :: forall m. MonadJuggle String m => String -> m Number
 pgTimestamptzToMilliseconds =
   pgTimestamptzToMilliseconds_f Nothing Just
   >>> case _ of
-    Nothing -> Left "Invalid date format"
-    Just ms -> Right ms
+    Nothing -> juggle "Invalid date format"
+    Just ms -> pure ms
 
 foreign import pgTimestamptzToMilliseconds_f ::
   Maybe Number -> (Number -> Maybe Number) ->

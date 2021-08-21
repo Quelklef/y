@@ -3,21 +3,20 @@ module Y.Server.Persist where
 import Prelude
 
 import Effect.Aff (Aff)
-import Effect.Console as Console
-import Effect.Class (liftEffect)
-import Control.Monad.Error.Class (throwError)
 import Data.Tuple.Nested ((/\))
-import Data.Either (Either(..), note)
-import Data.Array as Array
+import Data.Newtype (class Newtype, un)
+import Data.Either (Either(..))
 
 import Y.Shared.Util.Sorted (Sorted)
 import Y.Shared.Util.Sorted as Sorted
+import Y.Shared.Pg.ToPg (class InnerTup) as Pg  -- TODO: leaking implementation details =(
+import Y.Shared.Pg.FromPg (class FromPg, fromPg, mkImpl) as Pg
+import Y.Shared.Pg.Types (PgExpr, Tup(..)) as Pg
 import Y.Shared.Event (Event(..), EventPayload(..))
 import Y.Shared.Id (Id)
-import Y.Shared.ToFromPostgres (PgRetrievedVal(..)) as Pg
 
 import Y.Server.ServerConfig (ServerConfig)
-import Y.Server.Postgres (class FromPgRow, class ToPgRow, Database, Tup(..), all, atomically, fromPgRow, new, run, run_) as Pg
+import Y.Server.Postgres (Database, query, exec, exec_, atomically, new) as Pg
 
 open :: ServerConfig -> Aff Pg.Database
 open config = Pg.new config.dbConnectionString
@@ -47,9 +46,9 @@ insertEvent (Event event) db = case event.payload of
 
   where
 
-  insertEvent_fromPayload :: forall r. Pg.ToPgRow (Pg.Tup r) => String -> String -> r -> Aff Unit
+  insertEvent_fromPayload :: forall r. Pg.InnerTup r => String -> String -> r -> Aff Unit
   insertEvent_fromPayload payloadKind payloadInsertSql payloadRow =
-    db # Pg.run
+    db # Pg.exec
       ("""
       WITH returned AS (
         """ <> payloadInsertSql <> """
@@ -62,51 +61,42 @@ insertEvent (Event event) db = case event.payload of
 
 newtype RetrievedEvent = RetrievedEvent Event
 
-unRetrievedEvent :: RetrievedEvent -> Event
-unRetrievedEvent (RetrievedEvent event) = event
+derive instance newtype_RetrievedEvent :: Newtype RetrievedEvent _
 
-instance instance_FromPgRow_RetrievedEvent :: Pg.FromPgRow (Either String) RetrievedEvent where
-  fromPgRow row = do
+instance fromPgRow_RetrievedEvent :: Pg.FromPg RetrievedEvent where
+  impl = Pg.mkImpl
+    \(Pg.Tup (id /\ payloadKind /\ time /\ roomId /\ (payloadStuff :: Pg.PgExpr))) -> do
 
-    let eventStuff = Array.slice 0 4 row
-    payloadStuff <-
-      Array.index row 4
-      # note "Missing event payload"
-      >>= case _ of
-        Pg.PgRow ar -> pure ar
-        _ -> throwError "Expected array"
+      payload <- case payloadKind of
+        "SetName" -> do
+          Pg.Tup (userId /\ name) <- Pg.fromPg payloadStuff
+          pure $ EventPayload_SetName { userId, name }
 
-    Pg.Tup (id /\ payloadKind /\ time /\ roomId) <- Pg.fromPgRow eventStuff
+        "MessageSend" -> do
+          Pg.Tup (userId /\ messageId /\ depIds /\ timeSent /\ content) <- Pg.fromPg payloadStuff
+          pure $ EventPayload_MessageSend { userId, messageId, depIds, timeSent, content }
 
-    payload <- case payloadKind of
-      "SetName" -> do
-        Pg.Tup (userId /\ name) <- Pg.fromPgRow payloadStuff
-        pure $ EventPayload_SetName { userId, name }
+        "MessageEdit" -> do
+          Pg.Tup (userId /\ messageId /\ content) <- Pg.fromPg payloadStuff
+          pure $ EventPayload_MessageEdit { userId, messageId, content }
 
-      "MessageSend" -> do
-        Pg.Tup (userId /\ messageId /\ depIds /\ timeSent /\ content) <- Pg.fromPgRow payloadStuff
-        pure $ EventPayload_MessageSend { userId, messageId, depIds, timeSent, content }
+        "MessageDelete" -> do
+          Pg.Tup (userId /\ messageId) <- Pg.fromPg payloadStuff
+          pure $ EventPayload_MessageDelete { userId, messageId }
 
-      "MessageEdit" -> do
-        Pg.Tup (userId /\ messageId /\ content) <- Pg.fromPgRow payloadStuff
-        pure $ EventPayload_MessageEdit { userId, messageId, content }
+        "MessageSetIsUnread" -> do
+          Pg.Tup (userId /\ messageId /\ isUnread) <- Pg.fromPg payloadStuff
+          pure $ EventPayload_MessageSetIsUnread { userId, messageId, isUnread }
 
-      "MessageDelete" -> do
-        Pg.Tup (userId /\ messageId) <- Pg.fromPgRow payloadStuff
-        pure $ EventPayload_MessageDelete { userId, messageId }
+        _ -> do
+          Left $ "Unrecognized payload kind: " <> payloadKind
 
-      "MessageSetIsUnread" -> do
-        Pg.Tup (userId /\ messageId /\ isUnread) <- Pg.fromPgRow payloadStuff
-        pure $ EventPayload_MessageSetIsUnread { userId, messageId, isUnread }
-
-      _ -> do
-        throwError $ "Unrecognized payload kind: " <> payloadKind
-
-    pure $ RetrievedEvent $ Event { id, time, payload, roomId }
+      pure $ RetrievedEvent $ Event { id, time, payload, roomId }
 
 retrieveEvents :: Id "Room" -> Pg.Database -> Aff (Sorted Array Event)
 retrieveEvents = \roomId db -> do
-  (maybeRetrievedEvents :: Either String (Array RetrievedEvent)) <- db # Pg.all """
+  -- TODO: don't error entire array if only one is malformatted
+  (events :: Array RetrievedEvent) <- db # Pg.query """
     SELECT 
 
       id
@@ -116,43 +106,33 @@ retrieveEvents = \roomId db -> do
 
     , CASE
         WHEN payloadKind = 'SetName'
-        THEN ( SELECT to_json((userId, name)) FROM EventPayload_SetName WHERE pk = payloadPk )
-          -- ^ to_json used to deal with the fact that the underlying js <-> pg lib
-          --   can't parse tuples :(
+        THEN ( SELECT row(userId, name) FROM EventPayload_SetName WHERE pk = payloadPk )
 
         WHEN payloadKind = 'MessageSend'
-        THEN ( SELECT to_json((userId, messageId, depIds, timeSent, content)) FROM EventPayload_MessageSend WHERE pk = payloadPk )
+        THEN ( SELECT row(userId, messageId, depIds, timeSent, content) FROM EventPayload_MessageSend WHERE pk = payloadPk )
 
         WHEN payloadKind = 'MessageEdit'
-        THEN ( SELECT to_json((userId, messageId, content)) FROM EventPayload_MessageEdit WHERE pk = payloadPk )
+        THEN ( SELECT row(userId, messageId, content) FROM EventPayload_MessageEdit WHERE pk = payloadPk )
 
         WHEN payloadKind = 'MessageDelete'
-        THEN ( SELECT to_json((userId, messageId)) FROM EventPayload_MessageDelete WHERE pk = payloadPk )
+        THEN ( SELECT row(userId, messageId) FROM EventPayload_MessageDelete WHERE pk = payloadPk )
 
         WHEN payloadKind = 'MessageSetIsUnread'
-        THEN ( SELECT to_json((userId, messageId, isUnread)) FROM EventPayload_MessageSetIsUnread WHERE pk = payloadPk )
+        THEN ( SELECT row(userId, messageId, isUnread) FROM EventPayload_MessageSetIsUnread WHERE pk = payloadPk )
       END
 
     FROM Event
     WHERE roomId = $1
     ORDER BY time ASC;
   """ (Pg.Tup roomId)
-
-  let maybeEvents = maybeRetrievedEvents # (map <<< map) unRetrievedEvent
-
-  case maybeEvents of
-    Left err -> do
-      liftEffect $ Console.warn $ "Failure when pulling from database: " <> err
-      pure $ Sorted.empty
-    Right events -> do
-      pure $ Sorted.fromAsc events
+  pure $ Sorted.fromAsc (events # map (un RetrievedEvent))
 
 migrate :: ServerConfig -> Pg.Database -> Aff Unit
 migrate config db =
 
   -- TODO: instead of using IF NOT EXISTS, support a migrations folder
   db # Pg.atomically do
-    db # Pg.run_ """
+    db # Pg.exec_ """
       CREATE TABLE IF NOT EXISTS Event
         ( id          TEXT        PRIMARY KEY
         , payloadPk   INT         NOT NULL

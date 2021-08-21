@@ -4,104 +4,88 @@ import Prelude
 
 import Effect (Effect)
 import Effect.Aff (Aff)
+import Effect.Aff.Class (class MonadAff, liftAff)
 import Control.Promise (Promise, toAffE)
-import Data.Tuple.Nested (type (/\), (/\))
-import Data.Array as Array
-import Control.Monad.Error.Class (class MonadThrow, throwError, catchError)
-import Data.Maybe (Maybe(..), fromMaybe)
+import Control.Monad.Error.Class (throwError, catchError)
+import Data.Bifunctor (lmap)
+import Data.Newtype (un)
 import Data.Traversable (traverse)
 
-import Y.Shared.ToFromPostgres (class ToPg, toPg, PgRetrievedVal(..), class FromPg, fromPg)
-
--- | Provides ToPgRow and FromPgRow instances for fixed-width rows
-newtype Tup a = Tup a
-
-unTup :: forall a. Tup a -> a
-unTup (Tup a) = a
-
-class ToPgRow a where
-  toPgRow :: a -> Array String
-
-instance toPgRow_rec :: (ToPg a, ToPg b, ToPgRow (Tup r)) => ToPgRow (Tup (a /\ (b /\ r))) where
-  toPgRow (Tup (a /\ (b /\ r))) = [toPg a, toPg b] <> toPgRow (Tup r)
-else instance toPgRow_base :: (ToPg a, ToPg b) => ToPgRow (Tup (a /\ b)) where
-  toPgRow (Tup (a /\ b)) = [toPg a, toPg b]
-else instance toPgRow_one :: ToPg a => ToPgRow (Tup a) where
-  toPgRow (Tup a) = [toPg a]
-
-class FromPgRow :: forall k. (k -> Type) -> k -> Constraint
-class FromPgRow m a where
-  fromPgRow :: Array PgRetrievedVal -> m a
-
-instance fromPgRow_rec :: (MonadThrow String m, FromPg m a, FromPg m b, FromPgRow m (Tup r)) => FromPgRow m (Tup (a /\ (b /\ r))) where
-  fromPgRow row =
-    (do
-      { head: a, tail: rest } <- Array.uncons row
-      { head: b, tail: rest } <- Array.uncons rest
-      pure $ a /\ b /\ rest)
-    # case _ of
-      Just (a /\ b /\ rest) -> map Tup $ (\x y z -> x /\ y /\ z) <$> fromPg a <*> fromPg b <*> (unTup <$> fromPgRow rest)
-      Nothing -> throwError "Wrong number of results"
-
-else instance fromPgRow_base :: (MonadThrow String m, FromPg m a, FromPg m b) => FromPgRow m (Tup (a /\ b)) where
-  fromPgRow = case _ of
-    [a, b] -> map Tup $ (/\) <$> fromPg a <*> fromPg b
-    _ -> throwError "Wrong number of results"
-
-else instance fromPgRow_one :: (MonadThrow String m, FromPg m a) => FromPgRow m (Tup a) where
-  fromPgRow = case _ of
-    [a] -> Tup <$> fromPg a
-    _ -> throwError "Wrong number of results"
+import Y.Shared.Util.MonadJuggle (class MonadJuggle, fromEither)
+import Y.Shared.Pg.ToPg (class ToPg, toPg)
+import Y.Shared.Pg.FromPg (class FromPg)
+import Y.Shared.Pg.FromPg (fromPg) as Pg
+import Y.Shared.Pg.Types (PgExpr(..), Tup0, tup0)
+import Y.Shared.Pg.Internal.ParseComposite (parseComposite)
 
 foreign import data Database :: Type
 foreign import new_f :: String -> Effect (Promise Database)
 foreign import query_f ::
-  { nullVal :: PgRetrievedVal
-  , arrayVal :: Array (PgRetrievedVal) -> PgRetrievedVal
-  , rowVal :: Array (PgRetrievedVal) -> PgRetrievedVal
-  , otherVal :: String -> PgRetrievedVal
-  , caseMaybeOf :: forall a r. Maybe a -> r -> (a -> r) -> r
-  } ->
-  Database -> String -> Maybe (Array String) -> Effect (Promise (Array (Array PgRetrievedVal)))
+  { db :: Database
+  , sql :: String
+  , params :: Array PgExpr
+  } -> Effect (Promise (Array PgExpr))  -- (pg expr)[]
 
-query :: Database -> String -> Maybe (Array String) -> Effect (Promise (Array (Array PgRetrievedVal)))
-query = query_f
-  { nullVal: PgNull
-  , arrayVal: PgArray
-  , rowVal: PgRow
-  , otherVal: PgOther
-  , caseMaybeOf: \maybe onNothing onJust -> maybe # map onJust # fromMaybe onNothing
-  }
+toAff' :: forall m a. MonadAff m => Effect (Promise a) -> m a
+toAff' = toAffE >>> liftAff
 
 new :: String -> Aff Database
-new connectionString = toAffE $ new_f connectionString
+new connectionString = toAff' $ new_f connectionString
 
-all :: forall v m r. Applicative m => ToPgRow v => FromPgRow m r => String -> v -> Database -> Aff (m (Array r))
-all sql vals db = (toAffE $ query db sql (Just $ toPgRow vals)) # map (traverse fromPgRow)
+type PgErr = String  -- TODO
 
-all_ :: forall m r. Applicative m => FromPgRow m r => String -> Database -> Aff (m (Array r))
-all_ sql db = (toAffE $ query db sql Nothing) # map (traverse fromPgRow)
+-- | Perform a query
+query ::
+  forall p m r.
+  MonadJuggle PgErr m => MonadAff m => ToPg p => FromPg r =>
+  String -> p -> Database -> m (Array r)
+query sql params db = do
+  paramExprs <- parseParams $ toPg params
+  exprs <- query_f { db, sql, params: paramExprs } # toAff'
+  vals <- traverse Pg.fromPg exprs
+  pure vals
 
-one :: forall v m r. MonadThrow String m => ToPgRow v => FromPgRow m r => String -> v -> Database -> Aff (m r)
-one sql vals db = all sql vals db # map (_ >>= case _ of
-  [v] -> pure v
-  r -> throwError $ "Expected exactly one value from database, not " <> show (Array.length r))
+  where
 
--- TODO: one_
+  parseParams :: MonadJuggle PgErr m => PgExpr -> m (Array PgExpr)
+  parseParams expr =
+    expr
+    # parseComposite { open: "(", delim: ",", close: ")" }
+    # lmap (\err ->
+      "Failed to parse PostgreSQL parameters.\n"
+      <> "This likely means you provided parameters as a value (:: a) instead of a row (:: Tup a).\n"
+      <> "Parameter expression: " <> un PgExpr expr <> "\n"
+      <> "Underlying parse error: " <> err)
+    # fromEither
 
-run :: forall v. ToPgRow v => String -> v -> Database -> Aff Unit
-run sql vals db = (toAffE $ query db sql (Just $ toPgRow vals)) # void
+-- | Like `query`, but no query parameters
+query_ ::
+  forall m r.
+  MonadJuggle PgErr m => MonadAff m => FromPg r =>
+  String -> Database -> m (Array r)
+query_ sql db = query sql tup0 db
 
-run_ :: String -> Database -> Aff Unit
-run_ sql db = (toAffE $ query db sql Nothing) # void
+-- | Like `query`, but no return value
+exec ::
+  forall p m.
+  MonadJuggle PgErr m => MonadAff m => ToPg p =>
+  String -> p -> Database -> m Unit
+exec sql params db = void (query sql params db :: m (Array Tup0))
+
+-- | Like `query`, but no query parameters or return value
+exec_ ::
+  forall m.
+  MonadJuggle PgErr m => MonadAff m =>
+  String -> Database -> m Unit
+exec_ sql db = exec sql tup0 db
 
 atomically :: forall a. Aff a -> Database -> Aff Unit
 atomically act db = do
   catchError
     (do
-      db # run_ "BEGIN"
-      _ <- act
-      db # run_ "COMMIT")
+      db # exec_ "BEGIN"
+      void act
+      db # exec_ "COMMIT")
     (\err -> do
-      db # run_ "ROLLBACK"
+      db # exec_ "ROLLBACK"
       throwError err)

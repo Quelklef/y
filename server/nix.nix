@@ -82,14 +82,19 @@ in {
 
       root=$PWD
 
-      function y.run-server {(
-        cd "$root" && echo index.js | ${pkgs.entr}/bin/entr -c ${pkgs.nodejs}/bin/node --trace-uncaught index.js
-      )}
+      function y.run-server {
+        local args="$@"
+        (
+          cd "$root" && echo index.js \
+            | ${pkgs.entr}/bin/entr -c \
+            ${pkgs.nodejs}/bin/node --trace-uncaught index.js "$@"
+        )
+      }
 
       function y.pg-init {
         mkdir -p "$root"/pg/{cluster,socket}
         initdb "$root"/pg/cluster
-        pg-start
+        y.pg-start
         createdb y
         createuser y
       }

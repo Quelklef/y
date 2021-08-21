@@ -2,8 +2,6 @@ module Main where
 
 import Prelude
 
-import Debug as D
-
 import Effect (Effect)
 import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Ref (Ref)
@@ -111,11 +109,9 @@ onTransmission = \client tn -> case tn of
       Just room -> pure $ room /\ state
       Nothing -> do
         events <- state.db # Persist.retrieveEvents roomId
-        let _ = D.log events
         let (room :: Room) = { id: roomId, events }
         let state' = state { rooms = state.rooms # Map.insert roomId room }
         pure $ room /\ state'
-
 
 onClose :: Client -> State -> Effect State
 onClose client state = do

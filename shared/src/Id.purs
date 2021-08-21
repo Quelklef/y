@@ -26,7 +26,8 @@ import Data.Argonaut.Decode (class DecodeJson, decodeJson) as Agt
 
 import Y.Shared.Util.BigInt (BigInt)
 import Y.Shared.Util.BigInt as BigInt
-import Y.Shared.ToFromPostgres as TFPg
+import Y.Shared.Pg.ToPg (class ToPg, toPg) as Pg
+import Y.Shared.Pg.FromPg (class FromPg, mkImpl) as Pg
 
 -- | Characters used in IDs
 -- | Order is significant
@@ -121,8 +122,8 @@ parse = split (Pattern "-") >>> case _ of
     pure $ Id { time, rand }
   _ -> Left "Wrong number of parts"
 
-instance toPg_Id :: IsSymbol ns => TFPg.ToPg (Id ns) where
-  toPg = format >>> TFPg.toPg
+instance toPg_Id :: IsSymbol ns => Pg.ToPg (Id ns) where
+  toPg = format >>> Pg.toPg
 
-instance fromPg_Id :: IsSymbol ns => TFPg.FromPg (Either String) (Id ns) where
-  fromPg = TFPg.fromPg >=> parse
+instance fromPg_Id :: IsSymbol ns => Pg.FromPg (Id ns) where
+  impl = Pg.mkImpl parse
