@@ -6,11 +6,13 @@ import Effect.Aff (Aff)
 import Data.Tuple.Nested ((/\))
 import Data.Newtype (class Newtype, un)
 import Data.Either (Either(..))
+import Data.Bifunctor (lmap)
 
 import Database.Postgres.ToPg (class InnerTup) as Pg  -- TODO: leaking implementation details =(
 import Database.Postgres.FromPg (class FromPg, fromPg, mkImpl) as Pg
 import Database.Postgres.Types (PgExpr, Tup(..)) as Pg
-import Database.Postgres (Database, query, exec, exec_, atomically, new) as Pg
+import Database.Postgres.Query as Pq
+import Database.Postgres.Query (Database, new) as Pg  -- TODO: move Database and new elsewhere
 
 import Y.Shared.Util.Sorted (Sorted)
 import Y.Shared.Util.Sorted as Sorted
@@ -49,7 +51,7 @@ insertEvent (Event event) db = case event.payload of
 
   insertEvent_fromPayload :: forall r. Pg.InnerTup r => String -> String -> r -> Aff Unit
   insertEvent_fromPayload payloadKind payloadInsertSql payloadRow =
-    db # Pg.exec
+    db # Pq.execThrow
       ("""
       WITH returned AS (
         """ <> payloadInsertSql <> """
@@ -69,23 +71,23 @@ instance fromPgRow_RetrievedEvent :: Pg.FromPg RetrievedEvent where
     \(Pg.Tup (id /\ payloadKind /\ time /\ roomId /\ (payloadStuff :: Pg.PgExpr))) -> do
 
       payload <- case payloadKind of
-        "SetName" -> do
+        "SetName" -> lmap show do
           Pg.Tup (userId /\ name) <- Pg.fromPg payloadStuff
           pure $ EventPayload_SetName { userId, name }
 
-        "MessageSend" -> do
+        "MessageSend" -> lmap show do
           Pg.Tup (userId /\ messageId /\ depIds /\ timeSent /\ content) <- Pg.fromPg payloadStuff
           pure $ EventPayload_MessageSend { userId, messageId, depIds, timeSent, content }
 
-        "MessageEdit" -> do
+        "MessageEdit" -> lmap show do
           Pg.Tup (userId /\ messageId /\ content) <- Pg.fromPg payloadStuff
           pure $ EventPayload_MessageEdit { userId, messageId, content }
 
-        "MessageDelete" -> do
+        "MessageDelete" -> lmap show do
           Pg.Tup (userId /\ messageId) <- Pg.fromPg payloadStuff
           pure $ EventPayload_MessageDelete { userId, messageId }
 
-        "MessageSetIsUnread" -> do
+        "MessageSetIsUnread" -> lmap show do
           Pg.Tup (userId /\ messageId /\ isUnread) <- Pg.fromPg payloadStuff
           pure $ EventPayload_MessageSetIsUnread { userId, messageId, isUnread }
 
@@ -97,7 +99,7 @@ instance fromPgRow_RetrievedEvent :: Pg.FromPg RetrievedEvent where
 retrieveEvents :: Id "Room" -> Pg.Database -> Aff (Sorted Array Event)
 retrieveEvents = \roomId db -> do
   -- TODO: don't error entire array if only one is malformatted
-  (events :: Array RetrievedEvent) <- db # Pg.query """
+  (events :: Array RetrievedEvent) <- db # Pq.queryThrow """
     SELECT 
 
       id
@@ -132,8 +134,8 @@ migrate :: ServerConfig -> Pg.Database -> Aff Unit
 migrate config db =
 
   -- TODO: instead of using IF NOT EXISTS, support a migrations folder
-  db # Pg.atomically do
-    db # Pg.exec_ """
+  db # Pq.atomically do
+    db # Pq.execThrow_ """
       CREATE TABLE IF NOT EXISTS Event
         ( id          TEXT        PRIMARY KEY
         , payloadPk   INT         NOT NULL

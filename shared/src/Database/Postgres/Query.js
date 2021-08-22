@@ -27,7 +27,6 @@ async function()
 
   console.log('Executing the following SQL:\n' + sql);
 
-  // v TODO: catch{} into monad
   const returned = await db.query(query);
 
   let rows;

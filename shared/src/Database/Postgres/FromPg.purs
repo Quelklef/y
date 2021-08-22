@@ -3,6 +3,7 @@ module Database.Postgres.FromPg
   , Impl
   , mkImpl
   , fromPg
+  , ParseErr
 
   -- v Impl details forced to be exported by ps
   , impl
@@ -25,6 +26,7 @@ import Data.Int (fromString) as Int
 import Data.Number (fromString) as Number
 import Data.Newtype (un)
 import Data.Tuple.Nested (type (/\), (/\))
+import Data.Maybe (fromMaybe)
 import Data.Either (Either(..))
 import Data.Bifunctor (lmap)
 import Data.Set (Set)
@@ -32,8 +34,6 @@ import Data.Set (fromFoldable) as Set
 
 import Database.Postgres.Types (Tup(..), PgExpr(..))
 import Database.Postgres.Internal.ParseComposite (parseComposite) as PC
-
-import Y.Shared.Util.MonadJuggle (class MonadJuggle, fromEither)
 
 -- | Class of types which can be parsed out of SQL expressions
 class FromPg a where
@@ -78,44 +78,28 @@ type ExprParser a = PgExpr -> Either ParseErr a
 -- Because of this grammatical quirk, we are able to get away with
 -- using the simpler parser type [1].
 
-type ParseErr =
+data ParseErr = ParseErr
   { issue :: String  -- the actual error
   , context :: List String  -- messages, with earlier ones contextualizing later ones
   , culprit :: Maybe PgExpr  -- the erroneous code
+  , typename :: Maybe String
+  -- ^ Human-readable description of the parsed type
+  --   It's actually misleading to have this on ParseErr, since it's set
+  --   not during parsing but rather at the top-level parse function.
+  --   It's on this type for code convenience.
   }
 
--- begin util --
+-- end core --
 
-contextualize :: forall s a. String -> (s -> Either ParseErr a) -> (s -> Either ParseErr a)
-contextualize ctx parse expr = parse expr # lmap mapErr
-  where mapErr err = err { context = List.Cons ctx err.context }
+instance show_ParseErr :: Show ParseErr where
+  show = \(ParseErr err) ->
+    let
+      indent :: String -> String -> String
+      indent dent = String.split (String.Pattern "\n") >>> map (dent <> _) >>> intercalate "\n"
 
-fail :: forall a. Maybe PgExpr -> String -> Either ParseErr a
-fail culprit issue = Left { issue, culprit, context: mempty }
-
-mkImpl :: forall a b. FromPg a => (a -> Either String b) -> Impl b
-mkImpl parser =
-  let Impl innerImpl = (impl :: Impl a)
-      innerParser = innerImpl.parser
-  in Impl
-    { typename: innerImpl.typename  -- user types inherit pg typenames
-    , parser:
-        \expr -> do
-          val <- innerParser expr
-          res <- parser val # lmap \issue -> { issue, culprit: Nothing, context: List.singleton "After a successful parse" }
-          pure res
-    }
-
-fromPg :: forall m a. MonadJuggle String m => FromPg a => PgExpr -> m a
-fromPg expr = parser expr # lmap showErr # fromEither
-  where
-
-  Impl { parser, typename } = impl
-
-  showErr :: ParseErr -> String
-  showErr err =
+    in
       [ "Failed to parse PostgreSQL expr"
-      , "Of type: " <> typename
+      , "Of type: " <> fromMaybe "<unknown>" err.typename
       , "Because: " <> err.issue ]
       <>
       (case err.culprit of
@@ -126,11 +110,36 @@ fromPg expr = parser expr # lmap showErr # fromEither
       , "Probable cause: an SQL row was returned that does not match the format of some FromPg instance."
       ] # intercalate "\n"
 
-  indent :: String -> String -> String
-  indent dent = String.split (String.Pattern "\n") >>> map (dent <> _) >>> intercalate "\n"
+mkErr :: Maybe PgExpr -> String -> ParseErr
+mkErr culprit issue = ParseErr { issue, culprit, context: mempty, typename: Nothing }
+
+contextualize :: forall s a. String -> (s -> Either ParseErr a) -> (s -> Either ParseErr a)
+contextualize ctx parse expr = parse expr # lmap mapErr
+  where mapErr (ParseErr err) = ParseErr $ err { context = List.Cons ctx err.context }
+
+mkImpl :: forall a b. FromPg a => (a -> Either String b) -> Impl b
+mkImpl parser =
+  let Impl innerImpl = (impl :: Impl a)
+      innerParser = innerImpl.parser
+  in Impl
+    { typename: innerImpl.typename  -- user types inherit pg typenames
+    , parser:
+        \expr -> do
+          val <- innerParser expr
+          let parser' = contextualize "After a successful parse"
+                      $ parser <#> lmap \issue -> mkErr Nothing issue
+          res <- parser' val
+          pure res
+    }
+
+fromPg :: forall a. FromPg a => PgExpr -> Either ParseErr a
+fromPg expr = parser expr # lmap finalizeErr
+  where
+  Impl { parser, typename } = impl
+  finalizeErr (ParseErr err) = ParseErr $ err { typename = Just typename }
 
 parseComposite :: { open :: String, delim :: String, close :: String } -> PgExpr -> Either ParseErr (Array PgExpr)
-parseComposite opts expr = PC.parseComposite opts expr # lmap (\issue -> { issue, culprit: Just expr, context: mempty })
+parseComposite opts expr = PC.parseComposite opts expr # lmap (\issue -> mkErr (Just expr) issue)
 
 -- begin instances --
 
@@ -148,7 +157,7 @@ instance fromPg_Boolean :: FromPg Boolean where
         $ \expr -> case un PgExpr expr of
           "t" -> pure true
           "f" -> pure false
-          _ -> fail (Just expr) "Expected 't' or 'f'"
+          _ -> Left $ mkErr (Just expr) "Expected 't' or 'f'"
     }
 
 instance fromPg_Number :: FromPg Number where
@@ -156,7 +165,7 @@ instance fromPg_Number :: FromPg Number where
     { typename: "decimal number"
     , parser:
         contextualize "while parsing Number (REAL, FIXED)"
-        $ \expr -> Number.fromString (un PgExpr expr) # maybe (fail (Just expr) "Bad format") pure
+        $ \expr -> Number.fromString (un PgExpr expr) # maybe (Left $ mkErr (Just expr) "Bad format") pure
     }
 
 instance fromPg_Int :: FromPg Int where
@@ -164,7 +173,7 @@ instance fromPg_Int :: FromPg Int where
     { typename: "integral number"
     , parser:
         contextualize "while parsing Int (SMALLINT, INT, BIGINT)"
-        $ \expr -> Int.fromString (un PgExpr expr) # maybe (fail (Just expr) "Bad format") pure
+        $ \expr -> Int.fromString (un PgExpr expr) # maybe (Left $ mkErr (Just expr) "Bad format") pure
     }
 
 instance fromPg_Maybe :: FromPg a => FromPg (Maybe a) where
@@ -233,7 +242,7 @@ instance fromPgInnerTup_recur :: (FromPg a, InnerTup b) => InnerTup (a /\ b) whe
         \{ idx } ->
           contextualize ("while parsing element #" <> show idx)
           $ \exprs -> case Array.uncons exprs of
-            Nothing -> fail Nothing "Expected an element"
+            Nothing -> Left $ mkErr Nothing "Expected an element"
             Just { head, tail } -> do
               headVal <- aParser head
               tailVal <- bParser { idx: idx + 1 } tail
@@ -246,7 +255,7 @@ else instance fromPgInnerTup_empty :: InnerTup Unit where
     , parser:
         \_ exprs -> case Array.uncons exprs of
           Nothing -> pure unit
-          Just { head, tail: _ } -> fail (Just head) "Expected no elements"
+          Just { head, tail: _ } -> Left $ mkErr (Just head) "Expected no elements"
     }
 
 else instance fromPgInnerTup_base :: FromPg a => InnerTup a where
@@ -258,5 +267,5 @@ else instance fromPgInnerTup_base :: FromPg a => InnerTup a where
       , parser:
           \_ exprs -> case exprs of
             [expr] -> aParser expr
-            _ -> fail Nothing "Unexpected extraneous elements (too many values!)"
+            _ -> Left $ mkErr Nothing "Unexpected extraneous elements (too many values!)"
       }

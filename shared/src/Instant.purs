@@ -9,6 +9,7 @@ import Prelude
 
 import Effect (Effect)
 import Data.Maybe (Maybe(..))
+import Data.Either (Either, note)
 import Data.Generic.Rep (class Generic)
 import Data.Argonaut.Encode (class EncodeJson) as Agt
 import Data.Argonaut.Decode (class DecodeJson) as Agt
@@ -18,8 +19,6 @@ import Data.Argonaut.Decode.Generic (genericDecodeJson) as Agt
 import Database.Postgres.ToPg (class ToPg) as Pg
 import Database.Postgres.FromPg (class FromPg, mkImpl) as Pg
 import Database.Postgres.Types (PgExpr(..)) as Pg
-
-import Y.Shared.Util.MonadJuggle (class MonadJuggle, juggle)
 
 newtype Instant = Instant { milliseconds :: Number }
 
@@ -54,12 +53,8 @@ instance toPg_Instant :: Pg.ToPg Instant where
 instance fromPg_Instant :: Pg.FromPg Instant where
   impl = Pg.mkImpl $ pgTimestamptzToMilliseconds >>> map fromMilliseconds
 
-pgTimestamptzToMilliseconds :: forall m. MonadJuggle String m => String -> m Number
-pgTimestamptzToMilliseconds =
-  pgTimestamptzToMilliseconds_f Nothing Just
-  >>> case _ of
-    Nothing -> juggle "Invalid date format"
-    Just ms -> pure ms
+pgTimestamptzToMilliseconds :: String -> Either String Number
+pgTimestamptzToMilliseconds = pgTimestamptzToMilliseconds_f Nothing Just >>> note "Invalid date format"
 
 foreign import pgTimestamptzToMilliseconds_f ::
   Maybe Number -> (Number -> Maybe Number) ->
