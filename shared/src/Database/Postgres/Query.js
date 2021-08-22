@@ -42,6 +42,6 @@ function printComposite(arr, chars) {
   function escape(str) {
     const special = new Set([open, delim, close, '\\', '"']);
     const ok = [...special].every(char => !str.includes(char));
-    return ok ? str : '"' + [...str].map(ch => special.has(ch) ? '\\' + ch : ch).join('') + '"';
+    return ok ? str : [...str].map(ch => special.has(ch) ? '\\' + ch : ch).join('');
   }
 }

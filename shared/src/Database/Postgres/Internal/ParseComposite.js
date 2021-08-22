@@ -50,7 +50,7 @@ function readSubexpr(expr, i, specials) {
   const isQuoted = expr[i] === '"';
 
   if (isQuoted) {
-    specials = new Set([...specials, '"']);
+    specials = new Set(['"', '\\']);
     i++;
   }
 
