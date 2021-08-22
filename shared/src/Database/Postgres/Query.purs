@@ -40,11 +40,16 @@ foreign import query_f ::
 toAff' :: forall m a. MonadAff m => Effect (Promise a) -> m a
 toAff' = toAffE >>> liftAff
 
--- TODO: better types
+-- | Represents an error when executing a query
+-- |
+-- | The variants' semantics are as follows:
+-- | - `PgErr_ParamErr`: invalid query params
+-- | - `PgErr_ExecErr`: error came back from PostgreSQL
+-- | - `PgErr_ResultErr`: failed to parse result rows
 data PgErr
-  = PgErr_ParamErr String    -- failed to parse parameters
-  | PgErr_ExecErr Ex.Error   -- error when executing sql
-  | PgErr_ResultErr ParseErr -- failed to parse results
+  = PgErr_ParamErr String
+  | PgErr_ExecErr Ex.Error
+  | PgErr_ResultErr ParseErr
 
 toThrow :: forall m a. MonadAff m => Aff (Either PgErr a) -> m a
 toThrow aff = liftAff $ aff >>= \a -> liftEffect $ case a of
@@ -54,6 +59,27 @@ toThrow aff = liftAff $ aff >>= \a -> liftEffect $ case a of
   Right val -> pure val
 
 -- | Perform a query
+-- |
+-- | ```purescript
+-- | do
+-- |   let params = Tup $ 5 /\ 3
+-- |   (r :: Number) <- conn # query "SELECT $1 * $2;" params
+-- |   -- r == 15.0
+-- | ```
+-- |
+-- | This s essentially a 3 step process:
+-- | 1. Turn the params `p` into SQL expressions.
+-- |    This can fail if you are not passing in a `Tup`.
+-- |    Failures will be `PgErr_ParamErr`.
+-- | 2. Execute the SQL. This can fail for any number of reasons.
+-- |    Failures will be `PgErr_ExecErr`.
+-- | 3. Parse the returned SQL expressions. This can fail if the result type `r`
+-- |    doesn't match with the result rows. For instance, you are trying to parse
+-- |    the result of `SELECT 1;` into a `String`.
+-- |    Failures will be `PgErr_ResultErr`.
+-- |
+-- | Except in highly unusualy circumstances, the result should never fail
+-- | in `m`. Instead, it should return a `Left`.
 query ::
   forall p m r. MonadAff m => ToPg p => FromPg r =>
   String -> p -> Connection -> m (Either PgErr (Array r))
@@ -124,6 +150,9 @@ execThrow_ ::
   String -> Connection -> m Unit
 execThrow_ sql conn = toThrow $ exec_ sql conn
 
+-- | `conn # atomically f` is like `conn # f` except that `f` is preceeded
+-- | by a `BEGIN` statement and terminated by a `COMMIT` statement if no
+-- | errors occur or a `ROLLBACK` statement if they do.
 atomically :: forall a. Aff a -> Connection -> Aff Unit
 atomically act conn = do
   catchError

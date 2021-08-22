@@ -34,6 +34,29 @@ import Database.Postgres.Types (Tup(..), PgExpr(..))
 import Database.Postgres.Internal.ParseComposite (parseComposite) as PC
 
 -- | Class of types which can be parsed out of SQL expressions
+-- |
+-- | The type is pretty arcane, so let's start with example usage:
+-- |
+-- | ```purescript
+-- | newtype Box = Box { width :: Number, height :: Number }
+-- |
+-- | instance FromPg Box where
+-- |   impl = mkImpl
+-- |     $ \(width /\ height) ->
+-- |       if width < 0.0 || height < 0.0
+-- |       then Left "Cannot have a box with negative dimensions"
+-- |       else Right $ Box { width, height }
+-- | ```
+-- |
+-- | For an instance `FromPg a`, the single class method
+-- | is `impl :: Impl a`, which must always be created using `mkImpl.`
+-- | This strange setup is for secret technical reasons.
+-- |
+-- | `mkImpl` requests a parser of type `FromPg p => (p -> Either String a)`.
+-- | In other words, a function from some type `p` that we already know
+-- | how to parse to `Either` a `String` error or a result `a`.
+-- |
+-- | Make use of `FromPg` instances using `fromPg`.
 class FromPg a where
   impl :: Impl a
 -- Keep the type opaque because:
@@ -44,6 +67,9 @@ class FromPg a where
 --  b) Restricting access ot the SQL expressions gives better
 --     future compatibility for becoming database-polymorphic.
 
+-- | Represents a `FromPg` implementation.
+-- | This type is purposefully opaque.
+-- | See the `FromPg` docs for usage.
 newtype Impl a = Impl
   { parser :: ExprParser a
   , typename :: String
@@ -76,13 +102,20 @@ type ExprParser a = PgExpr -> Either ParseErr a
 -- Because of this grammatical quirk, we are able to get away with
 -- using the simpler parser type [1].
 
+-- | Represents a parse error
+-- |
+-- | Has the following attributes:
+-- | - `issue`: represents the actual error.
+-- | - `culprit`: the problematic SQL expression.
+-- | - `context`: a list of human-readable messages contexualizing the error.
+-- |              Earlier messages also contextualize later messages.
+-- | - `typename`: a human-readable description of the SQL type we're trying to parse.
 data ParseErr = ParseErr
-  { issue :: String  -- the actual error
-  , context :: List String  -- messages, with earlier ones contextualizing later ones
-  , culprit :: Maybe PgExpr  -- the erroneous code
+  { issue :: String
+  , context :: List String
+  , culprit :: Maybe PgExpr
   , typename :: Maybe String
-  -- ^ Human-readable description of the parsed type
-  --   It's actually misleading to have this on ParseErr, since it's set
+  -- ^ It's actually misleading to have this on ParseErr, since it's set
   --   not during parsing but rather at the top-level parse function.
   --   It's on this type for code convenience.
   }
@@ -130,6 +163,7 @@ mkImpl parser =
           pure res
     }
 
+-- | Parse a `PgExpr`
 fromPg :: forall a. FromPg a => PgExpr -> Either ParseErr a
 fromPg expr = parser expr # lmap finalizeErr
   where
@@ -141,12 +175,15 @@ parseComposite opts expr = PC.parseComposite opts expr # lmap (\issue -> mkErr (
 
 -- begin instances --
 
+-- | Parsing into `PgExpr` will return the expression unchanged
 instance fromPg_PgExpr :: FromPg PgExpr where
   impl = Impl { typename: "postgresql expression", parser: pure }
 
+-- | Parse as text (e.g., TEXT)
 instance fromPg_String :: FromPg String where
   impl = Impl { typename: "string", parser: un PgExpr >>> pure }
 
+-- | Parse a boolean
 instance fromPg_Boolean :: FromPg Boolean where
   impl = Impl
     { typename: "boolean"
@@ -158,6 +195,7 @@ instance fromPg_Boolean :: FromPg Boolean where
           _ -> Left $ mkErr (Just expr) "Expected 't' or 'f'"
     }
 
+-- | Parse a decimal-format number (e.g., INT, FLOATING, DOUBLE PRECISION)
 instance fromPg_Number :: FromPg Number where
   impl = Impl
     { typename: "decimal number"
@@ -166,6 +204,7 @@ instance fromPg_Number :: FromPg Number where
         $ \expr -> Number.fromString (un PgExpr expr) # maybe (Left $ mkErr (Just expr) "Bad format") pure
     }
 
+-- | Parse an integral-format number (e.g., INT, BIGINT)
 instance fromPg_Int :: FromPg Int where
   impl = Impl
     { typename: "integral number"
@@ -174,6 +213,7 @@ instance fromPg_Int :: FromPg Int where
         $ \expr -> Int.fromString (un PgExpr expr) # maybe (Left $ mkErr (Just expr) "Bad format") pure
     }
 
+-- | Parse an `a` or NULL
 instance fromPg_Maybe :: FromPg a => FromPg (Maybe a) where
   impl =
     let Impl innerImpl = (impl :: Impl a)
@@ -184,6 +224,7 @@ instance fromPg_Maybe :: FromPg a => FromPg (Maybe a) where
           expr -> Just <$> innerImpl.parser expr
       }
 
+-- | Parse an array
 instance fromPg_Array :: FromPg a => FromPg (Array a) where
   impl =
     let Impl innerImpl = (impl :: Impl a)
@@ -197,6 +238,7 @@ instance fromPg_Array :: FromPg a => FromPg (Array a) where
             pure vals
       }
 
+-- | Parse an array, then turn it into a set
 instance fromPg_Set :: (Ord a, FromPg a) => FromPg (Set a) where
   impl =
     let Impl innerImpl = (impl :: Impl a)
@@ -210,6 +252,10 @@ instance fromPg_Set :: (Ord a, FromPg a) => FromPg (Set a) where
             pure $ Set.fromFoldable vals
       }
 
+-- | Parse a PostgreSQL composite type.
+-- | For instance, to parse (INT, TEXT, BOOL), use the `FromPg` instance for `Tup (Int /\ String /\ Boolean)`
+-- |
+-- | Also see the documentation for `Database.Postgres.Types (Tup)`
 instance fromPg_Tup :: InnerTup a => FromPg (Tup a) where
   impl =
     let innerImpl = (impl_inner :: InnerTup_Impl a)
@@ -220,6 +266,7 @@ instance fromPg_Tup :: InnerTup a => FromPg (Tup a) where
           $ \expr -> parseComposite { open: "(", delim: ",", close: ")" } expr >>= innerImpl.parser { idx: 0 } # map Tup
       }
 
+-- | Leaked implementation detail
 class InnerTup a where
   impl_inner :: InnerTup_Impl a
 
