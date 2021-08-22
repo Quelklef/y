@@ -1,20 +1,19 @@
 module Database.Postgres.FromPg
   ( class FromPg
+  , fromPg
   , Impl
   , mkImpl
-  , fromPg
-  , ParseErr
+  , ParseErr(..)
 
-  -- v Impl details forced to be exported by ps
+  -- v Forced exports
   , impl
   , class InnerTup
   , impl_inner
-
   ) where
 
 import Prelude
 
-import Data.Maybe (Maybe(..), maybe)
+import Data.Maybe (Maybe(..), maybe, fromMaybe)
 import Data.String.Common (split) as String
 import Data.String.Pattern (Pattern(..)) as String
 import Data.List (List)
@@ -26,7 +25,6 @@ import Data.Int (fromString) as Int
 import Data.Number (fromString) as Number
 import Data.Newtype (un)
 import Data.Tuple.Nested (type (/\), (/\))
-import Data.Maybe (fromMaybe)
 import Data.Either (Either(..))
 import Data.Bifunctor (lmap)
 import Data.Set (Set)

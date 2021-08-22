@@ -7,17 +7,8 @@ pg.types.getTypeParser = () => x => x;
 // As it turns out, formatting of inserted rows doesn't also need to be disabled
 // We can just pass PostgreSQL expressions as strings and it'll work
 
-exports.new_f =
-connectionString =>
-async function()
-{
-  const client = new pg.Client({ connectionString });
-  await client.connect();
-  return client;
-};
-
 exports.query_f =
-({ db, sql, params }) =>
+({ conn, sql, params }) =>
 async function()
 {
   let query = { text: sql, rowMode: 'array' };
@@ -27,7 +18,7 @@ async function()
 
   console.log('Executing the following SQL:\n' + sql);
 
-  const returned = await db.query(query);
+  const returned = await conn.query(query);
 
   let rows;
 

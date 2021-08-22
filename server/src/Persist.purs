@@ -11,8 +11,8 @@ import Data.Bifunctor (lmap)
 import Database.Postgres.ToPg (class InnerTup) as Pg  -- TODO: leaking implementation details =(
 import Database.Postgres.FromPg (class FromPg, fromPg, mkImpl) as Pg
 import Database.Postgres.Types (PgExpr, Tup(..)) as Pg
+import Database.Postgres.Connection (Connection, open) as Pg
 import Database.Postgres.Query as Pq
-import Database.Postgres.Query (Database, new) as Pg  -- TODO: move Database and new elsewhere
 
 import Y.Shared.Util.Sorted (Sorted)
 import Y.Shared.Util.Sorted as Sorted
@@ -21,10 +21,10 @@ import Y.Shared.Id (Id)
 
 import Y.Server.ServerConfig (ServerConfig)
 
-open :: ServerConfig -> Aff Pg.Database
-open config = Pg.new config.dbConnectionString
+open :: ServerConfig -> Aff Pg.Connection
+open config = Pg.open config.dbConnectionString
 
-insertEvent :: Event -> Pg.Database -> Aff Unit
+insertEvent :: Event -> Pg.Connection -> Aff Unit
 insertEvent (Event event) db = case event.payload of
 
   EventPayload_SetName pl -> insertEvent_fromPayload "SetName"
@@ -96,7 +96,7 @@ instance fromPgRow_RetrievedEvent :: Pg.FromPg RetrievedEvent where
 
       pure $ RetrievedEvent $ Event { id, time, payload, roomId }
 
-retrieveEvents :: Id "Room" -> Pg.Database -> Aff (Sorted Array Event)
+retrieveEvents :: Id "Room" -> Pg.Connection -> Aff (Sorted Array Event)
 retrieveEvents = \roomId db -> do
   -- TODO: don't error entire array if only one is malformatted
   (events :: Array RetrievedEvent) <- db # Pq.queryThrow """
@@ -130,7 +130,7 @@ retrieveEvents = \roomId db -> do
   """ (Pg.Tup roomId)
   pure $ Sorted.fromAsc (events # map (un RetrievedEvent))
 
-migrate :: ServerConfig -> Pg.Database -> Aff Unit
+migrate :: ServerConfig -> Pg.Connection -> Aff Unit
 migrate config db =
 
   -- TODO: instead of using IF NOT EXISTS, support a migrations folder

@@ -1,4 +1,11 @@
-module Database.Postgres.ToPg where
+module Database.Postgres.ToPg
+  ( class ToPg
+  , toPg
+
+  -- v Forced exports
+  , class InnerTup
+  , toPg_inner
+  ) where
 
 import Prelude
 

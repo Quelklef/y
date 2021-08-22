@@ -1,4 +1,9 @@
-module Database.Postgres.Types where
+module Database.Postgres.Types
+  ( PgExpr(..)
+  , Tup(..)
+  , Tup0
+  , tup0
+  ) where
 
 import Prelude
 

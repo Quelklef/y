@@ -1,4 +1,15 @@
-module Database.Postgres.Query where
+module Database.Postgres.Query
+  ( query
+  , atomically
+  , PgErr(..)
+  , queryThrow
+  , query_
+  , queryThrow_
+  , exec
+  , execThrow
+  , exec_
+  , execThrow_
+  ) where
 
 import Prelude
 
@@ -14,24 +25,20 @@ import Data.Newtype (un)
 import Data.Traversable (traverse)
 import Data.Either (Either(..))
 
+import Database.Postgres.Internal.ParseComposite (parseComposite)
+import Database.Postgres.Connection (Connection)
 import Database.Postgres.ToPg (class ToPg, toPg)
 import Database.Postgres.FromPg (class FromPg, fromPg, ParseErr)
 import Database.Postgres.Types (PgExpr(..), Tup0, tup0)
-import Database.Postgres.Internal.ParseComposite (parseComposite)
 
-foreign import data Database :: Type
-foreign import new_f :: String -> Effect (Promise Database)
 foreign import query_f ::
-  { db :: Database
+  { conn :: Connection
   , sql :: String
   , params :: Array PgExpr
   } -> Effect (Promise (Array PgExpr))  -- (pg expr)[]
 
 toAff' :: forall m a. MonadAff m => Effect (Promise a) -> m a
 toAff' = toAffE >>> liftAff
-
-new :: String -> Aff Database
-new connectionString = toAff' $ new_f connectionString
 
 -- TODO: better types
 data PgErr
@@ -49,12 +56,12 @@ toThrow aff = liftAff $ aff >>= \a -> liftEffect $ case a of
 -- | Perform a query
 query ::
   forall p m r. MonadAff m => ToPg p => FromPg r =>
-  String -> p -> Database -> m (Either PgErr (Array r))
-query sql params db = liftAff $
+  String -> p -> Connection -> m (Either PgErr (Array r))
+query sql params conn = liftAff $
   case parseParams (toPg params) of
     Left e -> pure (Left $ PgErr_ParamErr e)
     Right paramExprs -> do
-      eitherResultExprs <- catchIntoEither $ toAffE $ query_f { db, sql, params: paramExprs }
+      eitherResultExprs <- catchIntoEither $ toAffE $ query_f { conn, sql, params: paramExprs }
       pure $ do
         resultExprs <- eitherResultExprs # lmap PgErr_ExecErr
         results <- traverse fromPg resultExprs # lmap PgErr_ResultErr
@@ -78,52 +85,52 @@ query sql params db = liftAff $
 -- | Like `query`, but errors are thrown in `Aff`
 queryThrow ::
   forall p m r. MonadAff m => ToPg p => FromPg r =>
-  String -> p -> Database -> m (Array r)
-queryThrow sql params db = toThrow $ query sql params db
+  String -> p -> Connection -> m (Array r)
+queryThrow sql params conn = toThrow $ query sql params conn
 
 -- | Like `query`, but no query parameters
 query_ ::
   forall m r. MonadAff m => FromPg r =>
-  String -> Database -> m (Either PgErr (Array r))
-query_ sql db = query sql tup0 db
+  String -> Connection -> m (Either PgErr (Array r))
+query_ sql conn = query sql tup0 conn
 
 -- | Like `query_`, but errors are thrown in `Aff`
 queryThrow_ ::
   forall m r. MonadAff m => FromPg r =>
-  String -> Database -> m (Array r)
-queryThrow_ sql db = toThrow $ query_ sql db
+  String -> Connection -> m (Array r)
+queryThrow_ sql conn = toThrow $ query_ sql conn
 
 -- | Like `query`, but no return value
 exec ::
   forall p m. MonadAff m => ToPg p =>
-  String -> p -> Database -> m (Either PgErr Unit)
-exec sql params db = rmap (\(_ :: Array Tup0) -> unit) <$> query sql params db
+  String -> p -> Connection -> m (Either PgErr Unit)
+exec sql params conn = rmap (\(_ :: Array Tup0) -> unit) <$> query sql params conn
 
 -- | Like `exec`, but errors are thrown in `Aff`
 execThrow ::
   forall p m. MonadAff m => ToPg p =>
-  String -> p -> Database -> m Unit
-execThrow sql params db = toThrow $ exec sql params db
+  String -> p -> Connection -> m Unit
+execThrow sql params conn = toThrow $ exec sql params conn
 
 -- | Like `exec`, but no query parameters or return value
 exec_ ::
   forall m. MonadAff m =>
-  String -> Database -> m (Either PgErr Unit)
-exec_ sql db = exec sql tup0 db
+  String -> Connection -> m (Either PgErr Unit)
+exec_ sql conn = exec sql tup0 conn
 
 -- | Like `exec_`, but errors are thrown in `Aff`
 execThrow_ ::
   forall m. MonadAff m =>
-  String -> Database -> m Unit
-execThrow_ sql db = toThrow $ exec_ sql db
+  String -> Connection -> m Unit
+execThrow_ sql conn = toThrow $ exec_ sql conn
 
-atomically :: forall a. Aff a -> Database -> Aff Unit
-atomically act db = do
+atomically :: forall a. Aff a -> Connection -> Aff Unit
+atomically act conn = do
   catchError
     (do
-      db # execThrow_ "BEGIN"
+      conn # execThrow_ "BEGIN"
       void act
-      db # execThrow_ "COMMIT")
+      conn # execThrow_ "COMMIT")
     (\err -> do
-      db # execThrow_ "ROLLBACK"
+      conn # execThrow_ "ROLLBACK"
       throwError err)

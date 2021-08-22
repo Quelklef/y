@@ -17,7 +17,7 @@ import Data.Tuple.Nested (type (/\), (/\))
 import Data.Traversable (for_)
 import Data.Filterable (class Filterable, filter)
 
-import Database.Postgres.Query as Postgres
+import Database.Postgres.Connection (Connection) as Pg
 
 import Y.Shared.Util.Sorted (Sorted)
 import Y.Shared.Util.Sorted as Sorted
@@ -33,7 +33,7 @@ import Y.Server.WebSocket as Ws
 import Y.Server.Persist as Persist
 
 type State =
-  { db :: Postgres.Database
+  { db :: Pg.Connection
   , rooms :: Map (Id "Room") Room
   , clients :: Map (Id "Client") Client
   , subs :: Relation (Id "Client") (Id "Room")
@@ -52,7 +52,7 @@ type Client =
   , wsClient :: Ws.Client Transmission.ToServer Transmission.ToClient
   }
 
-mkState0 :: Postgres.Database -> State
+mkState0 :: Pg.Connection -> State
 mkState0 db =
   { db: db
   , rooms: Map.empty
