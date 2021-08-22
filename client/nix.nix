@@ -39,6 +39,7 @@ nixed = shared.purs-nix.purs
         stringutils
         random
         aff
+        aff-promise
       ];
   };
 

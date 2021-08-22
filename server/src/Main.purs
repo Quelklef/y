@@ -17,6 +17,8 @@ import Data.Tuple.Nested (type (/\), (/\))
 import Data.Traversable (for_)
 import Data.Filterable (class Filterable, filter)
 
+import Database.Postgres as Postgres
+
 import Y.Shared.Util.Sorted (Sorted)
 import Y.Shared.Util.Sorted as Sorted
 import Y.Shared.Id (Id)
@@ -26,7 +28,6 @@ import Y.Shared.Transmission as Transmission
 
 import Y.Server.Util.Relation (Relation)
 import Y.Server.Util.Relation as Relation
-import Y.Server.Postgres as Postgres
 import Y.Server.ServerConfig (getServerConfig, SslConfig(..))
 import Y.Server.WebSocket as Ws
 import Y.Server.Persist as Persist

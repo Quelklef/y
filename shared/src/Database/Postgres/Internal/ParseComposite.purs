@@ -1,10 +1,10 @@
-module Y.Shared.Pg.Internal.ParseComposite (parseComposite) where
+module Database.Postgres.Internal.ParseComposite (parseComposite) where
 
 import Prelude
 
 import Data.Either (Either(..))
 
-import Y.Shared.Pg.Types (PgExpr)
+import Database.Postgres.Types (PgExpr)
 
 -- | Parse a PostgreSQL expression denoting a composite type (arrays, rows) into its elements
 foreign import parseComposite_f

@@ -1,4 +1,4 @@
-module Y.Server.Postgres where
+module Database.Postgres where
 
 import Prelude
 
@@ -11,12 +11,14 @@ import Data.Bifunctor (lmap)
 import Data.Newtype (un)
 import Data.Traversable (traverse)
 
+import Database.Postgres.ToPg (class ToPg, toPg)
+import Database.Postgres.FromPg (class FromPg)
+import Database.Postgres.FromPg (fromPg) as Pg
+import Database.Postgres.Types (PgExpr(..), Tup0, tup0)
+import Database.Postgres.Internal.ParseComposite (parseComposite)
+
+-- TODO: remove
 import Y.Shared.Util.MonadJuggle (class MonadJuggle, fromEither)
-import Y.Shared.Pg.ToPg (class ToPg, toPg)
-import Y.Shared.Pg.FromPg (class FromPg)
-import Y.Shared.Pg.FromPg (fromPg) as Pg
-import Y.Shared.Pg.Types (PgExpr(..), Tup0, tup0)
-import Y.Shared.Pg.Internal.ParseComposite (parseComposite)
 
 foreign import data Database :: Type
 foreign import new_f :: String -> Effect (Promise Database)

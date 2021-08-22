@@ -1,4 +1,4 @@
-module Y.Shared.Pg.Types where
+module Database.Postgres.Types where
 
 import Prelude
 

@@ -7,16 +7,17 @@ import Data.Tuple.Nested ((/\))
 import Data.Newtype (class Newtype, un)
 import Data.Either (Either(..))
 
+import Database.Postgres.ToPg (class InnerTup) as Pg  -- TODO: leaking implementation details =(
+import Database.Postgres.FromPg (class FromPg, fromPg, mkImpl) as Pg
+import Database.Postgres.Types (PgExpr, Tup(..)) as Pg
+import Database.Postgres (Database, query, exec, exec_, atomically, new) as Pg
+
 import Y.Shared.Util.Sorted (Sorted)
 import Y.Shared.Util.Sorted as Sorted
-import Y.Shared.Pg.ToPg (class InnerTup) as Pg  -- TODO: leaking implementation details =(
-import Y.Shared.Pg.FromPg (class FromPg, fromPg, mkImpl) as Pg
-import Y.Shared.Pg.Types (PgExpr, Tup(..)) as Pg
 import Y.Shared.Event (Event(..), EventPayload(..))
 import Y.Shared.Id (Id)
 
 import Y.Server.ServerConfig (ServerConfig)
-import Y.Server.Postgres (Database, query, exec, exec_, atomically, new) as Pg
 
 open :: ServerConfig -> Aff Pg.Database
 open config = Pg.new config.dbConnectionString

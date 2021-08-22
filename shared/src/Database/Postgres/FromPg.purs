@@ -1,4 +1,4 @@
-module Y.Shared.Pg.FromPg
+module Database.Postgres.FromPg
   ( class FromPg
   , Impl
   , mkImpl
@@ -10,8 +10,6 @@ module Y.Shared.Pg.FromPg
   , impl_inner
 
   ) where
-
--- Must be in shared/ so that shared types can implement FromPg
 
 import Prelude
 
@@ -32,9 +30,10 @@ import Data.Bifunctor (lmap)
 import Data.Set (Set)
 import Data.Set (fromFoldable) as Set
 
+import Database.Postgres.Types (Tup(..), PgExpr(..))
+import Database.Postgres.Internal.ParseComposite (parseComposite) as PC
+
 import Y.Shared.Util.MonadJuggle (class MonadJuggle, fromEither)
-import Y.Shared.Pg.Types (Tup(..), PgExpr(..))
-import Y.Shared.Pg.Internal.ParseComposite (parseComposite) as PC
 
 -- | Class of types which can be parsed out of SQL expressions
 class FromPg a where

@@ -15,10 +15,11 @@ import Data.Argonaut.Decode (class DecodeJson) as Agt
 import Data.Argonaut.Encode.Generic (genericEncodeJson) as Agt
 import Data.Argonaut.Decode.Generic (genericDecodeJson) as Agt
 
+import Database.Postgres.ToPg (class ToPg) as Pg
+import Database.Postgres.FromPg (class FromPg, mkImpl) as Pg
+import Database.Postgres.Types (PgExpr(..)) as Pg
+
 import Y.Shared.Util.MonadJuggle (class MonadJuggle, juggle)
-import Y.Shared.Pg.ToPg (class ToPg) as Pg
-import Y.Shared.Pg.FromPg (class FromPg, mkImpl) as Pg
-import Y.Shared.Pg.Types (PgExpr(..)) as Pg
 
 newtype Instant = Instant { milliseconds :: Number }
 

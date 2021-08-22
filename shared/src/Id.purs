@@ -24,10 +24,11 @@ import Data.Generic.Rep (class Generic)
 import Data.Argonaut.Encode (class EncodeJson, encodeJson) as Agt
 import Data.Argonaut.Decode (class DecodeJson, decodeJson) as Agt
 
+import Database.Postgres.ToPg (class ToPg, toPg) as Pg
+import Database.Postgres.FromPg (class FromPg, mkImpl) as Pg
+
 import Y.Shared.Util.BigInt (BigInt)
 import Y.Shared.Util.BigInt as BigInt
-import Y.Shared.Pg.ToPg (class ToPg, toPg) as Pg
-import Y.Shared.Pg.FromPg (class FromPg, mkImpl) as Pg
 
 -- | Characters used in IDs
 -- | Order is significant

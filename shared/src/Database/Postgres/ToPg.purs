@@ -1,6 +1,4 @@
-module Y.Shared.Pg.ToPg where
-
--- Must be in shared/ so that shared types can implement ToPg
+module Database.Postgres.ToPg where
 
 import Prelude
 
@@ -14,7 +12,7 @@ import Data.String.Common (replace) as Str
 import Data.String.Pattern (Pattern(..), Replacement(..)) as Str
 import Data.Newtype (un)
 
-import Y.Shared.Pg.Types (Tup(..), PgExpr(..))
+import Database.Postgres.Types (Tup(..), PgExpr(..))
 
 replace :: { this :: String, with :: String } -> String -> String
 replace { this, with } = Str.replace (Str.Pattern this) (Str.Replacement with)
