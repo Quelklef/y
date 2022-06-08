@@ -33,6 +33,7 @@ nixed = shared.purs-nix.purs
         aff
         aff-promise
         filterable
+        postgres
       ];
   };
 
