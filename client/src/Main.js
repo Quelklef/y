@@ -1,34 +1,34 @@
-exports.getWsTarget =
+export const getWsTarget =
 () =>
 {
   const isHttps = [...window.location.protocol].reverse()[1] === 's';
   return `${isHttps ? 'wss' : 'ws'}://${window.location.hostname}:8081`;
 };
 
-exports.localStorage = {}
+export const localStorage = {}
 
-exports.localStorage.has =
+localStorage.has =
 key =>
 () =>
 {
   return localStorage.getItem(key) !== null;
 };
 
-exports.localStorage.get =
+localStorage.get =
 key =>
 () =>
 {
   return localStorage.getItem(key) || '';
 };
 
-exports.localStorage.set =
+localStorage.set =
 key => val =>
 () =>
 {
   localStorage.setItem(key, val);
 };
 
-exports.getUrlParams_f =
+export const getUrlParams_f =
 mk2tuple => mapFromList =>
 () =>
 {
@@ -36,7 +36,7 @@ mk2tuple => mapFromList =>
   return mapFromList(params.map(([k, v]) => mk2tuple(k)(v)));
 };
 
-exports.appendUrlParam =
+export const appendUrlParam =
 key => val =>
 () =>
 {
@@ -53,7 +53,7 @@ key => val =>
    We assume that the body has only one element and that that element is
    the root node of the program
 */
-exports.workaround_redirectFocusFromBodyToRoot =
+export const workaround_redirectFocusFromBodyToRoot =
 () =>
 {
   function redirect() {
@@ -76,7 +76,7 @@ exports.workaround_redirectFocusFromBodyToRoot =
   });
 }
 
-exports.screenDimsMorallySub =
+export const screenDimsMorallySub =
 send =>
 () =>
 {

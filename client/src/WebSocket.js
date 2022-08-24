@@ -1,11 +1,11 @@
-exports.newConnection =
+export const newConnection =
 ({ url }) => () =>
 {
   const client = new WebSocket(url);
   return client;
 }
 
-exports.onOpen =
+export const onOpen =
 k => client => () =>
 {
   client.addEventListener('open', () => {
@@ -13,7 +13,7 @@ k => client => () =>
   });
 }
 
-exports.onTransmission_f =
+export const onTransmission_f =
 decode =>
 k => client => () =>
 {
@@ -25,7 +25,7 @@ k => client => () =>
   });
 }
 
-exports.transmit_f =
+export const transmit_f =
 text => client => () =>
 {
   console.log('Sending transmission:', text);

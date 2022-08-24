@@ -1,4 +1,4 @@
-exports.getEnv_f =
+export const getEnv_f =
 just => nothing =>
 varname =>
 () =>

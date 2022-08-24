@@ -1,15 +1,15 @@
-exports.add_f = b1 => b2 => b1 + b2;
-exports.zero_f = 0n;
-exports.mul_f = b1 => b2 => b1 * b2;
-exports.one_f = 1n;
-exports.sub_f = b1 => b2 => b1 - b2;
-exports.degree_f = b => Number(b);
-exports.div_f = b1 => b2 => b1 / b2;
-exports.mod_f = b1 => b2 => b1 % b2;
+export const add_f = b1 => b2 => b1 + b2;
+export const zero_f = 0n;
+export const mul_f = b1 => b2 => b1 * b2;
+export const one_f = 1n;
+export const sub_f = b1 => b2 => b1 - b2;
+export const degree_f = b => Number(b);
+export const div_f = b1 => b2 => b1 / b2;
+export const mod_f = b1 => b2 => b1 % b2;
 
-exports.eq_f = b1 => b2 => b1 === b2;
+export const eq_f = b1 => b2 => b1 === b2;
 
-exports.compare_f =
+export const compare_f =
 lt => eq => gt =>
 b1 => b2 =>
 {
@@ -18,10 +18,10 @@ b1 => b2 =>
   return eq;
 };
 
-exports.pow = b1 => b2 => eval('b1 ** b2');  // I cry
+export const pow = b1 => b2 => b1 ** b2;
 
-exports.toNumber = b => Number(b);
-exports.fromNumber_f =
+export const toNumber = b => Number(b);
+export const fromNumber_f =
 nothing => just =>
 n =>
 {
@@ -29,5 +29,5 @@ n =>
     return nothing;
   return just(BigInt(n));
 };
-exports.fromInt = n => BigInt(n);
-exports.toInt = b => Number(b);
+export const fromInt = n => BigInt(n);
+export const toInt = b => Number(b);

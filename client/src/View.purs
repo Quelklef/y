@@ -177,7 +177,8 @@ view model = { head: headView, body: [bodyView] }
         # Map.keys
         # Set.toUnfoldable
         # List.sortBy (comparing $ flip Map.lookup model.userIdToFirstEventTime)
-        # List.mapWithIndex (\idx userId -> Map.singleton userId idx)
+        # List.toUnfoldable
+        # Array.mapWithIndex (\idx userId -> Map.singleton userId idx)
         # foldl Map.union Map.empty
 
   headView :: Array (Html Action)
@@ -228,28 +229,28 @@ view model = { head: headView, body: [bodyView] }
 
           case maybeFocusedCard of
             Nothing ->
-              guard (Wwg.key keyEvent == "Enter") Actions.createDraft
+              guard (Wwg.key keyEvent == "Enter") (Just Actions.createDraft)
 
             Just focusedCard ->
               -- send/create draft on (shift-)enter
               if Wwg.key keyEvent == "Enter" then
                 case focusedCard.original of
-                  CardOriginal_Message _ -> Actions.createDraft
-                  _ -> Actions.noop
+                  CardOriginal_Message _ -> Just Actions.createDraft
+                  _ -> Nothing
 
               -- Select card on E
               else if Wwg.key keyEvent == "e" then
-                Actions.setSelected focusedCard.id (not $ isSelected focusedCard)
+                Just $ Actions.setSelected focusedCard.id (not $ isSelected focusedCard)
 
               -- Mark read/unread on R
               else if Wwg.key keyEvent == "r" then
-                Actions.setIsUnread focusedCard.id (not $ isUnread focusedCard.id)
+                Just $ Actions.setIsUnread focusedCard.id (not $ isUnread focusedCard.id)
 
               -- arrow key controls
               else if Wwg.key keyEvent == "ArrowUp" then
                 case Set.toUnfoldable focusedCard.depIds of
-                  [id] -> Actions.setFocused id
-                  _ -> Actions.noop
+                  [id] -> Just $ Actions.setFocused id
+                  _ -> Nothing
 
               else if ["ArrowLeft", "ArrowRight", "ArrowDown"] # Array.elem (Wwg.key keyEvent) then
                 let replies = Set.toUnfoldable (getReplies focusedCard.id) # Array.sortBy (comparing _.time)
@@ -259,9 +260,9 @@ view model = { head: headView, body: [bodyView] }
                    ]
                    # foldMap \(key /\ { to }) ->
                       guard (Wwg.key keyEvent == key) $
-                      replies Array.!! to # foldMap (_.id >>> Actions.setFocused)
+                      replies Array.!! to # foldMap (_.id >>> Actions.setFocused >>> Just)
 
-              else Actions.noop
+              else Nothing
     ]
     [ H.divS
       [ S.position "absolute"
@@ -440,7 +441,7 @@ view model = { head: headView, body: [bodyView] }
                            && Wwg.shiftKey keyEvent
                            && trimmed.content /= ""
                       action = guard ok $ Actions.sendMessage trimmed
-                  pure action
+                  pure $ Just action
             ]
           _ -> mempty
       ]

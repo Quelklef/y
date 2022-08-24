@@ -1,10 +1,10 @@
-exports.getNow_f =
+export const getNow_f =
 () =>
 {
   return +Date.now();
 };
 
-exports.pgTimestamptzToMilliseconds_f =
+export const pgTimestamptzToMilliseconds_f =
 nothing => just =>
 str =>
 {
@@ -14,7 +14,7 @@ str =>
   return just(r);
 };
 
-exports.millisecondsToPgTimestamptz =
+export const millisecondsToPgTimestamptz =
 ms =>
 {
   return new Date(ms).toISOString().replace('T', ' ').replace('Z', '') + '-00';

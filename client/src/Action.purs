@@ -12,6 +12,11 @@ import Y.Client.Core (Model, Y_Ws_Client)
 
 newtype Action = Action (Model -> ActionMonad Model)
 
+-- This unfortunate instance exists to satisfy 'Producer.Produce Action Action'
+-- WANT: fix this, either upstream or here.
+instance Eq Action where
+  eq _ _ = false
+
 unAction :: Action -> Model -> ActionMonad Model
 unAction (Action a) = a
 

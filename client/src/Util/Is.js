@@ -1,1 +1,1 @@
-exports.is = a => b => a === b;
+export const is = a => b => a === b;

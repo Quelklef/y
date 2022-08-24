@@ -31,7 +31,7 @@ nixed = shared.purs-nix.purs
         ns.ursi.html
         bifunctors
         integers
-        math
+        numbers
         control
         arrays
         lazy
@@ -40,6 +40,7 @@ nixed = shared.purs-nix.purs
         random
         aff
         aff-promise
+        postgres
       ];
   };
 

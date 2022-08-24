@@ -1,8 +1,8 @@
-const WebSocket = require('ws');
-const https = require('https');
-const fs = require('fs');
+import WebSocket from 'ws';
+import https from 'https';
+import fs from 'fs';
 
-exports.newServer_https =
+export const newServer_https =
 ({ sslInfo, port }) =>
 () =>
 {
@@ -12,14 +12,14 @@ exports.newServer_https =
   return wss;
 };
 
-exports.newServer_http =
+export const newServer_http =
 ({ port }) =>
 () =>
 {
   return new WebSocket.Server({ port });
 };
 
-exports.onConnection =
+export const onConnection =
 k => server => () =>
 {
   server.on('connection', client => {
@@ -27,7 +27,7 @@ k => server => () =>
   });
 };
 
-exports.onTransmission_f =
+export const onTransmission_f =
 decode =>
 k => client => () =>
 {
@@ -39,7 +39,7 @@ k => client => () =>
   });
 }
 
-exports.onClose =
+export const onClose =
 k => client => () =>
 {
   client.on('close', () => {
@@ -47,7 +47,7 @@ k => client => () =>
   });
 }
 
-exports.transmit_f =
+export const transmit_f =
 text => client => () =>
 {
   console.log('Sending transmission:', text);

@@ -1,10 +1,10 @@
-exports.getNow =
+export const getNow =
 () =>
 {
   return BigInt(Date.now());
 };
 
-exports.getRand =
+export const getRand =
 max =>
 () =>
 {

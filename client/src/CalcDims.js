@@ -1,4 +1,4 @@
-exports.getTheDimsAndCleanUp =
+export const getTheDimsAndCleanUp =
 wrapId =>
 () =>
 {

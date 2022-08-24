@@ -1,11 +1,11 @@
-exports.setTimeout0 =
+export const setTimeout0 =
 f =>
 () =>
 {
   setTimeout(f, 0);
 };
 
-exports.focusElementById =
+export const focusElementById =
 id =>
 () =>
 {
@@ -13,7 +13,7 @@ id =>
   if (el) el.focus();
 };
 
-exports.shuffle =
+export const shuffle =
 array =>
 () =>
 // from https://stackoverflow.com/a/2450976/4608364

@@ -4,8 +4,21 @@ let
 
 shared = import ../shared/nix.nix { inherit pkgs; };
 
+npmlock2nix =
+  import
+    (pkgs.fetchFromGitHub
+      { owner = "tweag";
+        repo = "npmlock2nix";
+        rev = "5c4f247688fc91d665df65f71c81e0726621aaa8";
+        sha256 = "1zkrcph1vqgl0q7yi9cg0ghq1mmvhy8rlc6xvyww56i3j87cg5gn";
+      }
+    ) { inherit pkgs; };
+
+node_modules = npmlock2nix.node_modules { src = ./.; };
+
 nixed = shared.purs-nix.purs
   { srcs = [ ../server ../shared ];
+
     dependencies =
       with shared.purs-nix.ps-pkgs;
       let ns = shared.purs-nix.ps-pkgs-ns; in
@@ -35,18 +48,9 @@ nixed = shared.purs-nix.purs
         filterable
         postgres
       ];
+
+    foreign."Database.Postgres".node_modules = "${node_modules}/node_modules";
   };
-
-npmlock2nix =
-  let fetched = pkgs.fetchFromGitHub {
-        owner = "tweag";
-        repo = "npmlock2nix";
-        rev = "8ada8945e05b215f3fffbd10111f266ea70bb502";
-        sha256 = "0ni3z64wf1cha7xf5vqzqfqs73qc938zvnnbn147li1m4v8pnzzx";
-      };
-  in import fetched { inherit pkgs; };
-
-node_modules = npmlock2nix.node_modules { src = ./.; };
 
 in {
 
@@ -73,6 +77,12 @@ in {
     buildInputs =
       [ (nixed.command {
           srcs = [ "$PWD/../server" "$PWD/../shared" ];
+          bundle.esbuild = {
+            platform = "node";
+            external = [ "pg-native" ];
+              # ^ node library underlying purescript-postgres needs this
+              #   seems to require() a dep it doesn't actually use ..?
+          };
         })
         pkgs.nodejs
         pkgs.postgresql

@@ -9,7 +9,9 @@ import Prelude
 import Effect (Effect)
 import Effect.Uncurried (EffectFn1, mkEffectFn1, runEffectFn1)
 
-import Sub (Sub, ForeignSub, Canceler, newBuilder, newForeign)
+import Data.Batched (Batched (Single))
+import Sub (Sub, SingleSub (SingleSub), Canceler)
+import Producer (producer)
 
 import Y.Shared.Util.Codable (class Decodable)
 
@@ -25,17 +27,22 @@ websocketClientToSub = websocketClientToMorallySub >>> morallySubToSub
 -- It's expected to use this function to set up the subscription, for instance
 -- by kicking of an timer which will invoke @update@ once every second.
 -- Then, it's expected to produce a @canceler :: Effect Unit@.
-type MorallySub a = ((a -> Effect Unit) -> Effect (Canceler))
+type MorallySub a = ((a -> Effect Unit) -> Effect Canceler)
 
 websocketClientToMorallySub :: forall m ts tc. Decodable m tc => Client ts tc -> MorallySub (m tc)
 websocketClientToMorallySub client = \update -> (client # onTransmission update) $> canceler
   where (canceler :: Canceler) = pure unit
 
 morallySubToSub :: MorallySub ~> Sub
-morallySubToSub = morallySubToForeignSub >>> foreignSubToSub
+morallySubToSub ms = Single $ SingleSub $ producer unNeverEq (NeverEq ms)
 
-morallySubToForeignSub :: forall a. MorallySub a -> (EffectFn1 (EffectFn1 a Unit) Canceler)
-morallySubToForeignSub ms = mkEffectFn1 (\update -> ms (runEffectFn1 update))
 
-foreignSubToSub :: ForeignSub ~> Sub
-foreignSubToSub = newBuilder >>> newForeign
+-- workaround for elmish producer API
+
+newtype NeverEq a = NeverEq a
+
+unNeverEq :: forall a. NeverEq a -> a
+unNeverEq (NeverEq a) = a
+
+instance Eq (NeverEq a) where
+  eq _ _ = false

@@ -9,7 +9,7 @@ import Data.Array as Array
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Map as Map
 import Data.Int (floor)
-import Math as Math
+import Data.Number as Math
 import Data.Foldable (foldl, foldMap)
 import Data.Monoid (power)
 import Effect (Effect)

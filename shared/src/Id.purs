@@ -5,17 +5,17 @@ import Prelude
 import Effect (Effect)
 import Effect.Unsafe (unsafePerformEffect)
 import Effect.Exception (throw)
-import Data.Maybe (Maybe(..), fromJust, fromMaybe)
-import Data.Either (Either(..), note)
+import Type.Proxy (Proxy (Proxy))
+import Data.Maybe (Maybe (..), fromJust, fromMaybe)
+import Data.Either (Either (..), note)
 import Data.Array as Array
-import Data.Set as Set
 import Data.Tuple.Nested ((/\))
-import Data.Symbol (class IsSymbol, reflectSymbol, SProxy(..))
+import Data.Symbol (class IsSymbol, reflectSymbol)
 import Data.String.Common (toLower, split)
 import Data.String.CodeUnits (toCharArray)
 import Data.String.CodeUnits (length, slice, singleton) as String
 import Data.String.CodePoints (indexOf)
-import Data.String.Pattern (Pattern(..))
+import Data.String.Pattern (Pattern (..))
 import Data.Traversable (traverse)
 import Data.Foldable (foldl)
 import Partial.Unsafe (unsafePartial)
@@ -84,7 +84,7 @@ maxRand :: BigInt
 maxRand = BigInt.pow (BigInt.fromInt $ String.length idCharSeq) len - one
   where len = BigInt.fromInt 4
 
-getNs :: forall ns. IsSymbol ns => SProxy ns -> Effect BigInt
+getNs :: forall ns. IsSymbol ns => Proxy ns -> Effect BigInt
 getNs proxy =
   case reflectSymbol proxy of
     "" -> throw "Invalid namespace: cannot be empty"
@@ -95,19 +95,17 @@ getNs proxy =
 -- | Generate a new identifier
 new :: forall ns. IsSymbol ns => Effect (Id ns)
 new = do
-  _ <- getNs (SProxy :: SProxy ns)
+  _ <- getNs (Proxy :: Proxy ns)
   time <- getNow
   rand <- getRand maxRand
   pure $ Id { time, rand }
-
-  where toCharSet = toCharArray >>> Set.fromFoldable
 
 -- | Convert an identifier to a string
 format :: forall ns. IsSymbol ns => Id ns -> String
 format (Id id) =
   let
-    ns = toDigits idCharSeq $ unsafePerformEffect $ getNs (SProxy :: SProxy ns)
-    ns0 = unsafePartial $ fromJust $ reflectSymbol (SProxy :: SProxy ns) # String.slice 0 1
+    ns = toDigits idCharSeq $ unsafePerformEffect $ getNs (Proxy :: Proxy ns)
+    ns0 = reflectSymbol (Proxy :: Proxy ns) # String.slice 0 1
     timeStr = toDigits idCharSeq id.time
     randStr = toDigits idCharSeq id.rand
   in
@@ -116,8 +114,8 @@ format (Id id) =
 -- | Parse an identifier
 parse :: forall ns. IsSymbol ns => String -> Either String (Id ns)
 parse = split (Pattern "-") >>> case _ of
-  [ns0, ns, timeStr, randStr] -> do
-    when (ns /= (toDigits idCharSeq $ unsafePerformEffect $ getNs (SProxy :: SProxy ns))) $ Left "Wrong namespace"
+  [_ns0, ns, timeStr, randStr] -> do
+    when (ns /= (toDigits idCharSeq $ unsafePerformEffect $ getNs (Proxy :: Proxy ns))) $ Left "Wrong namespace"
     time <- fromDigits idCharSeq timeStr # note "Invalid timestamp"
     rand <- fromDigits idCharSeq randStr # note "Invalid random"
     pure $ Id { time, rand }
