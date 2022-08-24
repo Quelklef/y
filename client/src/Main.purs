@@ -25,7 +25,7 @@ import Y.Client.View (view)
 import Y.Client.WebSocket as Ws
 import Y.Client.ToSub (websocketClientToSub, MorallySub, morallySubToSub)
 
-foreign import localStorage ::
+foreign import localStorage_ ::
   { has :: String -> Effect Boolean
   , get :: String -> Effect String
   , set :: String -> String -> Effect Unit
@@ -57,11 +57,11 @@ main = do
 
   userId <- do
     let key = "userId"
-    exists <- localStorage.has key
+    exists <- localStorage_.has key
     when (not $ exists) do
       (id :: Id "User") <- Id.new
-      localStorage.set key (Id.format id)
-    idStr <- localStorage.get key
+      localStorage_.set key (Id.format id)
+    idStr <- localStorage_.get key
     case Id.parse idStr of
       Right id -> pure id
       Left _ -> throw "Corrupted localStorage"

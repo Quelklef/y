@@ -52,6 +52,18 @@ nixed = shared.purs-nix.purs
     foreign."Database.Postgres".node_modules = "${node_modules}/node_modules";
   };
 
+purs-nix-bundle-args = {
+  esbuild = {
+    platform = "node";
+    external =
+      [ "pg-native" ]
+        # ^ node library underlying purescript-postgres needs this
+        #   seems to require() a dep it doesn't actually use ..?
+      ++ [ "pg" "ws" ];
+        # ^ uhhhh the nix-build needs these and idk why...
+  };
+};
+
 in {
 
   deriv = pkgs.stdenv.mkDerivation {
@@ -63,7 +75,7 @@ in {
     installPhase = ''
       mkdir $out
 
-      cp ${nixed.modules.Main.bundle {}} $out/index.js
+      cp ${nixed.modules.Main.bundle purs-nix-bundle-args} $out/index.js
 
       mkdir -p $out/node_modules/
       cp -r ${node_modules}/node_modules $out/
@@ -77,12 +89,7 @@ in {
     buildInputs =
       [ (nixed.command {
           srcs = [ "$PWD/../server" "$PWD/../shared" ];
-          bundle.esbuild = {
-            platform = "node";
-            external = [ "pg-native" ];
-              # ^ node library underlying purescript-postgres needs this
-              #   seems to require() a dep it doesn't actually use ..?
-          };
+          bundle = purs-nix-bundle-args;
         })
         pkgs.nodejs
         pkgs.postgresql

@@ -5,23 +5,23 @@ export const getWsTarget =
   return `${isHttps ? 'wss' : 'ws'}://${window.location.hostname}:8081`;
 };
 
-export const localStorage = {}
+export const localStorage_ = {}
 
-localStorage.has =
+localStorage_.has =
 key =>
 () =>
 {
   return localStorage.getItem(key) !== null;
 };
 
-localStorage.get =
+localStorage_.get =
 key =>
 () =>
 {
   return localStorage.getItem(key) || '';
 };
 
-localStorage.set =
+localStorage_.set =
 key => val =>
 () =>
 {
