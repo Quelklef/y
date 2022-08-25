@@ -34,15 +34,16 @@ websocketClientToMorallySub client = \update -> (client # onTransmission update)
   where (canceler :: Canceler) = pure unit
 
 morallySubToSub :: MorallySub ~> Sub
-morallySubToSub ms = Single $ SingleSub $ producer unNeverEq (NeverEq ms)
+morallySubToSub ms = Single $ SingleSub $ producer unAlwaysEq (AlwaysEq ms)
 
 
 -- workaround for elmish producer API
+-- this is fragile and only works because we never cancel subscriptions
 
-newtype NeverEq a = NeverEq a
+newtype AlwaysEq a = AlwaysEq a
 
-unNeverEq :: forall a. NeverEq a -> a
-unNeverEq (NeverEq a) = a
+unAlwaysEq :: forall a. AlwaysEq a -> a
+unAlwaysEq (AlwaysEq a) = a
 
-instance Eq (NeverEq a) where
-  eq _ _ = false
+instance Eq (AlwaysEq a) where
+  eq _ _ = true
