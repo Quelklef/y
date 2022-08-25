@@ -44,6 +44,13 @@ nixed = shared.purs-nix.purs
       ];
   };
 
+purs-nix-bundle-args = {
+  esbuild.format = "iife";
+  # ^ necessary in some cases due to js bizareness
+  #   compare 'var top = 5; console.log(top);'
+  #   with '(function() { var top = 5; console.log(top); })'
+};
+
 in {
 
   deriv = pkgs.stdenv.mkDerivation {
@@ -54,7 +61,7 @@ in {
       mkdir $out
 
       cp $src/index.html $out/
-      cp ${nixed.modules.Main.bundle {}} $out/index.js
+      cp ${nixed.modules.Main.bundle purs-nix-bundle-args} $out/index.js
 
       echo "${pkgs.python3}/bin/python3.8 -m http.server -d \$(dirname \$(readlink -f \$0))" > $out/run.sh
       chmod +x $out/run.sh
@@ -65,6 +72,7 @@ in {
     buildInputs = [
       (nixed.command {
         srcs = [ "$PWD/../client" "$PWD/../shared" ];
+        bundle = purs-nix-bundle-args;
       })
       pkgs.python3
     ];
