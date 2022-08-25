@@ -50,22 +50,19 @@ key => val =>
    event listeners on the document body.
    The workaround is to redirect the default focus from document.body to
    the actual program root node.
-   We assume that the body has only one element and that that element is
-   the root node of the program
+   We assume that the body has at least one child element and that that
+   element is the root node of the Elmish app
 */
 export const workaround_redirectFocusFromBodyToRoot =
 () =>
 {
   function redirect() {
     if (document.activeElement !== document.body) return;
-
-    const err = `In order to redirect focus from body, expected body to have 1 child node, not ${document.body.childNodes.length}`;
-    if (document.body.childNodes.length === 0) throw Error(err);
-    if (document.body.childNodes.length !== 1) console.warn(err);
-
-    const root = document.body.childNodes[0];
+    const root = document.body.lastElementChild;
+    if (!root)
+      throw Error('In order to redirect focus from body, expected body to have >=1 child element');
     root.tabIndex = '0';  // fuck
-    if (root) root.focus();
+    root.focus();
   }
 
   document.addEventListener('DOMContentLoaded', () => {
