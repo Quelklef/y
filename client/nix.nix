@@ -61,7 +61,7 @@ in {
       mkdir $out
 
       cp $src/index.html $out/
-      cp ${nixed.modules.Main.bundle purs-nix-bundle-args} $out/index.js
+      cp ${nixed.modules.Main.bundle purs-nix-bundle-args} $out/main.js
 
       echo "${pkgs.python3}/bin/python3.8 -m http.server -d \$(dirname \$(readlink -f \$0))" > $out/run.sh
       chmod +x $out/run.sh

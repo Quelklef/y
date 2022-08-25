@@ -37,7 +37,7 @@ y =
     inherit (y-version) rev sha256;
   };
 
-y-client = with-uglified "index.js" (import (y + /client/default.nix) { inherit pkgs; });
+y-client = with-uglified "main.js" (import (y + /client/default.nix) { inherit pkgs; });
 y-server = import (y + /server/default.nix) { inherit pkgs; };
 
 host = if toProd then "165.227.67.28" else "165.22.46.18";
