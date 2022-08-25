@@ -1,6 +1,8 @@
 module Y.Shared.Instant
   ( Instant
   , getNow
+  , fromSeconds
+  , asSeconds
   , fromMilliseconds
   , asMilliseconds
   ) where

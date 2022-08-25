@@ -64,6 +64,16 @@ purs-nix-bundle-args = {
   };
 };
 
+local-postgres =
+  import
+    (pkgs.fetchFromGitHub
+      { owner = "quelklef";
+        repo = "local-postgres";
+        rev = "7a313efd50eb7710fee02b719728028486ff4526";
+        sha256 = "1qw9b97f1pp0fyji0z684b0ja8b32n24m19izqj7km45sczqgljx";
+      }
+    ) { inherit pkgs; };
+
 in {
 
   deriv = pkgs.stdenv.mkDerivation {
@@ -92,45 +102,32 @@ in {
           bundle = purs-nix-bundle-args;
         })
         pkgs.nodejs
-        pkgs.postgresql
+        pkgs.entr
+        local-postgres
       ];
 
     shellHook = ''
+
       ${shared.mk-shellhook { dir = "server"; }}
 
       root=$PWD
 
-      function y.run-server {
-        local args="$@"
-        (
-          cd "$root" && echo index.js \
-            | ${pkgs.entr}/bin/entr -c \
-            ${pkgs.nodejs}/bin/node --trace-uncaught index.js "$@"
-        )
-      }
+      function y.server.run {(
+        cd $root
+        [ -d ./pg ] || lpg make ./pg
+        lpg do ./pg bash -c 'pg_ctl status || pg_ctl start' || return 1
+        purs-nix bundle &&
+        Y_DB_CONNECTION_STRING=$(lpg do ./pg bash -c 'echo $LPG_CONNSTR') \
+          node --trace-uncaught ./index.js
+      )}
 
-      function y.pg-init {
-        mkdir -p "$root"/pg/{cluster,socket}
-        initdb "$root"/pg/cluster
-        y.pg-start
-        createdb y
-        createuser y
-      }
-      export PGDATA=$PWD/pg/cluster
+      function y.server.watch {(
+        cd $root
+        export root
+        export -f y.server.run
+        git ls-files .. | xargs realpath | grep -E 'server|shared' | entr -csr y.server.run
+      )}
 
-      function y.pg-start {
-        pg_ctl -l "$root"/pg/log -o "--unix_socket_directories='$root/pg/socket'" start
-        # stop with pg_ctl stop
-      }
-      export PGHOST=$root/pg/socket
-
-      function y.pg-obliterate {
-        # Sometimes useful
-        ps -aux | grep postgres | awk '{ print $2 }' | xargs sudo kill -9
-      }
-
-      export LC_ALL=C.UTF-8  # fix postgres
-      export Y_DB_CONNECTION_STRING="postgresql://y@localhost?host=$root/pg/socket"
     '';
   };
 

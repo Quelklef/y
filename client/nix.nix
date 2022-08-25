@@ -62,23 +62,32 @@ in {
   };
 
   shell = pkgs.mkShell {
-    buildInputs =
-      [ (nixed.command {
-          srcs = [ "$PWD/../client" "$PWD/../shared" ];
-        })
-      ];
+    buildInputs = [
+      (nixed.command {
+        srcs = [ "$PWD/../client" "$PWD/../shared" ];
+      })
+      pkgs.python3
+    ];
 
     shellHook = ''
+
       ${shared.mk-shellhook { dir = "client"; }}
 
-      function y.serve-client {
-        if ! [[ "$(pwd)" == */y/client ]]; then
-          echo >&2 "Run in y/client/"
-          return 1
-        fi
+      root=$PWD
 
-        ${pkgs.python3}/bin/python -m http.server
-      }
+      function y.client.serve {(
+        cd $root
+        purs-nix bundle &&
+        python -m http.server
+      )}
+
+      function y.client.watch {(
+        cd $root
+        export root
+        export -f y.client.serve
+        git ls-files .. | xargs realpath | grep -E 'client|shared' | entr -csr y.client.serve
+      )}
+
     '';
   };
 

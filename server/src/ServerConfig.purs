@@ -32,14 +32,3 @@ getServerConfig = do
 
   pure { sslConfig, dbConnectionString }
 
-  where
-
-  parseBool :: String -> Maybe Boolean
-  parseBool = case _ of
-    "0" -> Just false
-    "1" -> Just true
-    "false" -> Just false
-    "true" -> Just true
-    "False" -> Just false
-    "True" -> Just true
-    _ -> Nothing

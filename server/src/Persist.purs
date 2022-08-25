@@ -131,7 +131,7 @@ retrieveEvents = \roomId db -> do
   pure $ Sorted.fromAsc (events # map (un RetrievedEvent))
 
 migrate :: ServerConfig -> Pg.Connection -> Aff Unit
-migrate config db =
+migrate _config db =
 
   -- TODO: instead of using IF NOT EXISTS, support a migrations folder
   db # Pq.atomically do
