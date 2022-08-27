@@ -1,4 +1,4 @@
-module Y.Client.ArrangementAlgorithms.TreelikeNaive (arrange) where
+module Y.Client.Layouts.TreelikeAveraging where
 
 import Prelude
 
@@ -14,6 +14,7 @@ import Partial.Unsafe (unsafePartial)
 import Y.Client.Util.Vec2 (Vec2(..), getX, getY)
 import Y.Client.Util.MultiMap (MultiMap)
 import Y.Client.Util.MultiMap as MultiMap
+import Y.Client.Layouts.Core (Layout (Generic))
 
 spacingX :: Number
 spacingX = 50.0
@@ -81,6 +82,10 @@ average fs = let vs = List.fromFoldable fs
                       sy = vs # map getY # sum
                       n = length vs
                   in Just $ Vec2 { x: sx / n, y: sy / n }
+
+
+layout :: Layout
+layout = Generic arrange
 
 arrange :: forall node time id x. Ord node => Ord time => Ord id =>
            { getId :: node -> id
@@ -153,3 +158,4 @@ arrange { getId, getDepIds, getTime, getDims, nodes: allNodes } =
   stage3'adjust places = places # map (_ - center)
     where center = rootNodes # map getId # map getPlacement # average # fromMaybe zero
           getPlacement id = unsafePartial $ fromJust $ Map.lookup id places
+

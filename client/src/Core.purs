@@ -13,7 +13,7 @@ import Y.Shared.Instant (Instant)
 import Y.Shared.Id (Id)
 import Y.Shared.Event (Event)
 import Y.Shared.Transmission as Transmission
-import Y.Client.Arrange as Arrange
+import Y.Client.Layout as Layout
 import Y.Client.WebSocket as Ws
 
 type Y_Ws_Client = Ws.Client Transmission.ToServer Transmission.ToClient
@@ -25,7 +25,7 @@ type Model =
   , drafts :: Set Draft
   , selectedIds :: Set (Id "Message")
   , focusedId :: Maybe (Id "Message")
-  , arrangementAlgorithmKey :: String
+  , layoutName :: String
   , nicknameInputValue :: Maybe String
   , screenDims :: { width :: Number, height :: Number }
   , openContextMenuMessageId :: Maybe (Id "Message")
@@ -57,7 +57,7 @@ mkInitialModel userId roomId =
   , drafts: Set.empty
   , selectedIds: Set.empty
   , focusedId: Nothing
-  , arrangementAlgorithmKey: Arrange.defaultAlgoKey
+  , layoutName: Layout.defaultLayoutName
   , nicknameInputValue: Nothing
   , screenDims: { width: 0.0, height: 0.0 }  -- will be set by a subscription
   , openContextMenuMessageId: Nothing

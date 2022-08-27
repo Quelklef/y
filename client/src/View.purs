@@ -40,10 +40,10 @@ import Y.Client.Util.Vec2 as Vec2
 import Y.Client.Util.Memoize (memoize)
 import Y.Client.Util.Global (global)
 import Y.Client.Core (Model, Draft, Message)
-import Y.Client.Action (Action(..))
+import Y.Client.Action (Action (..))
 import Y.Client.Actions as Actions
-import Y.Client.Arrange (algorithms) as Arrange
-import Y.Client.ArrangementAlgorithms.Types (ArrangementAlgorithm(..)) as Arrange
+import Y.Client.Layout (layouts) as Layout
+import Y.Client.Layouts.Core (invoke) as Layout
 import Y.Client.CalcDims (calcDims)
 import Y.Client.Colors as Colors
 
@@ -129,9 +129,6 @@ view model = { head: headView, body: [bodyView] }
     CardOriginal_Draft _ -> true
     CardOriginal_Message _ -> false
 
-  arrange = case unsafeFromJust $ Map.lookup model.arrangementAlgorithmKey Arrange.algorithms of
-        Arrange.ArrangementAlgorithm algo -> algo
-
   calcDims'cached :: Card -> { width :: Number, height :: Number }
   calcDims'cached =
     let dimsCache = global "QdyjNN4JModpDGXRLgZn" $ Lazy.defer \_ -> unsafePerformEffect $ Ref.new Map.empty
@@ -141,9 +138,12 @@ view model = { head: headView, body: [bodyView] }
         , by: \card -> isDraft card /\ card.id
         }
 
+  positions :: Map (Id "Message") Vec2
   positions =
-    arrange
+    let algo = unsafeFromJust $ Map.lookup model.layoutName Layout.layouts
+    in Layout.invoke algo
       { getId: _.id
+      , printId: Id.format
       , getDepIds: _.depIds >>> Set.toUnfoldable
       , getTime: _.time
       , getDims: calcDims'cached
@@ -305,7 +305,7 @@ view model = { head: headView, body: [bodyView] }
       , S.alignItems "flex-end"
       ]
       [ ]
-      [ viewArrangementAlgorithmPicker model.arrangementAlgorithmKey
+      [ viewLayoutPicker model.layoutName
       , viewNameChanger
       , H.button
         [ A.onClick Actions.appendManyMessages ]
@@ -467,16 +467,16 @@ view model = { head: headView, body: [bodyView] }
       [ ]
       [ ]
 
-  viewArrangementAlgorithmPicker :: String -> Html Action
-  viewArrangementAlgorithmPicker selection =
+  viewLayoutPicker :: String -> Html Action
+  viewLayoutPicker selection =
     H.p
       [ ]
-      [ H.text "arrangement algorithm: "
+      [ H.text "layout: "
       , H.selectS
           [ S.fontFamily "inherit"
           ]
-          [ A.onInput \newSelection -> Action \m -> pure $ m { arrangementAlgorithmKey = newSelection } ]
-          ( Arrange.algorithms # Map.keys # Set.toUnfoldable # map \algoKey ->
+          [ A.onInput \newSelection -> Action \m -> pure $ m { layoutName = newSelection } ]
+          ( Layout.layouts # Map.keys # Set.toUnfoldable # map \algoKey ->
                 H.option
                 [ if algoKey == selection then A.selected "selected" else mempty ]
                 [ H.text algoKey ]
