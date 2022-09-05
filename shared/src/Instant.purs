@@ -11,14 +11,17 @@ import Prelude
 
 import Effect (Effect)
 import Data.Maybe (Maybe(..))
-import Data.Either (Either, note)
+import Data.Number as Number
+import Data.Either (Either (..), note)
 import Data.Generic.Rep (class Generic)
-import Data.Argonaut.Encode (class EncodeJson) as Agt
-import Data.Argonaut.Decode (class DecodeJson) as Agt
-import Data.Argonaut.Encode.Generic (genericEncodeJson) as Agt
-import Data.Argonaut.Decode.Generic (genericDecodeJson) as Agt
-import Test.QuickCheck.Arbitrary (class Arbitrary, genericArbitrary)
+import Data.Argonaut.Encode (class EncodeJson, encodeJson) as Agt
+import Data.Argonaut.Decode (class DecodeJson, decodeJson) as Agt
+import Data.Argonaut.Decode.Error (JsonDecodeError (..)) as Agt
+import Test.QuickCheck.Arbitrary (class Arbitrary, arbitrary)
+import Test.QuickCheck.Gen (suchThat)
 import Data.Show.Generic (genericShow)
+import Data.String.Utils (startsWith, endsWith)
+import Data.String.CodeUnits (slice)
 
 import Database.Postgres.ToPg (class ToPg) as Pg
 import Database.Postgres.FromPg (class FromPg, mkImpl) as Pg
@@ -35,11 +38,9 @@ derive instance eqInstant :: Eq Instant
 derive instance ordInstant :: Ord Instant
 
 derive instance genericInstant :: Generic Instant _
-instance Arbitrary Instant where arbitrary = genericArbitrary
+instance Arbitrary Instant where
+  arbitrary = Instant <$> ( arbitrary `suchThat` (_ > zero) )
 instance Show Instant where show = genericShow
-
-instance encodeJsonInstant :: Agt.EncodeJson Instant where encodeJson = Agt.genericEncodeJson
-instance decodeJsonInstant :: Agt.DecodeJson Instant where decodeJson = Agt.genericDecodeJson
 
 fromMilliseconds :: Number -> Instant
 fromMilliseconds ms = Instant { milliseconds: ms }
@@ -67,3 +68,22 @@ foreign import pgTimestamptzToMilliseconds_f ::
   String -> Maybe Number
 
 foreign import millisecondsToPgTimestamptz :: Number -> String
+
+
+instance Agt.EncodeJson Instant where
+  encodeJson = asMilliseconds >>> show >>> (\s -> "e+" <> s <> "ms") >>> Agt.encodeJson
+
+instance Agt.DecodeJson Instant where
+  decodeJson json = do
+    str <- Agt.decodeJson json
+    if not (startsWith "e+" str && endsWith "ms" str)
+    then fail "bad format (prefix/suffix)"
+    else
+      let str' = slice 2 (-2) str
+      in case Number.fromString str' of
+        Nothing -> fail "bad format (number parse)"
+        Just n -> pure $ fromMilliseconds n
+
+    where
+
+    fail = Left <<< Agt.TypeMismatch  -- no other function String -> JsonDecodeError =(

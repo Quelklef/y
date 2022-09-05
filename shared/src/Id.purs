@@ -6,10 +6,10 @@ import Effect (Effect)
 import Effect.Unsafe (unsafePerformEffect)
 import Effect.Exception (throw)
 import Type.Proxy (Proxy (Proxy))
+import Data.Bifunctor (lmap)
 import Data.Maybe (Maybe (..), fromJust, fromMaybe)
 import Data.Either (Either (..), note)
 import Data.Array as Array
-import Data.Tuple.Nested ((/\))
 import Data.Symbol (class IsSymbol, reflectSymbol)
 import Data.String.Common (toLower, split)
 import Data.String.CodeUnits (toCharArray)
@@ -21,10 +21,12 @@ import Data.Foldable (foldl)
 import Partial.Unsafe (unsafePartial)
 import Data.Generic.Rep (class Generic)
 import Data.Show.Generic (genericShow)
-import Test.QuickCheck.Arbitrary (class Arbitrary, genericArbitrary)
+import Test.QuickCheck.Arbitrary (class Arbitrary, arbitrary)
+import Test.QuickCheck.Gen (suchThat)
 
 import Data.Argonaut.Encode (class EncodeJson, encodeJson) as Agt
 import Data.Argonaut.Decode (class DecodeJson, decodeJson) as Agt
+import Data.Argonaut.Decode.Error (JsonDecodeError (..)) as Agt
 
 import Database.Postgres.ToPg (class ToPg, toPg) as Pg
 import Database.Postgres.FromPg (class FromPg, mkImpl) as Pg
@@ -52,11 +54,11 @@ fromDigits digits =
 
 toDigits :: String -> BigInt -> String
 toDigits digits n =
-  let low = String.singleton $ unsafePartial $ fromJust $ Array.index (toCharArray digits) (BigInt.toInt $ n `mod` base)
+  let low = String.singleton $ unsafePartial $ fromJust $ Array.index (toCharArray $ digits) (BigInt.toInt $ n `mod` base)
       rest = n `div` base
       high = if rest > zero then toDigits digits rest else ""
   in high <> low
-  where base = BigInt.fromInt $ String.length digits
+  where base = BigInt.fromInt $ Array.length (toCharArray digits)
 
 newtype AgtBigInt = AgtBigInt BigInt
 
@@ -64,24 +66,24 @@ derive instance genericAgtBigInt :: Generic AgtBigInt _
 
 instance encodeJsonAgtBigInt :: Agt.EncodeJson AgtBigInt
   where encodeJson (AgtBigInt b) = Agt.encodeJson (BigInt.toNumber b)
+                                              -- WANT: this ^ is lossy; bad!
 instance decodeJsonAgtBigInt :: Agt.DecodeJson AgtBigInt
   where decodeJson = Agt.decodeJson >>> map (BigInt.fromNumber >>> fromMaybe zero >>> AgtBigInt)
                                               -- TODO: fail on Nothing ^^
+
 newtype Id (namespace :: Symbol) = Id { time :: BigInt, rand :: BigInt }
 
 derive instance Generic (Id ns) _
-instance Arbitrary (Id ns) where arbitrary = genericArbitrary
+
+instance Arbitrary (Id ns) where
+  arbitrary = do
+    time <- BigInt.fromInt <$> ( arbitrary `suchThat` (_ > 0) )
+    rand <- BigInt.fromInt <$> ( arbitrary `suchThat` (_ > 0) )
+    pure $ Id { time, rand }
 
 derive instance eqId :: Eq (Id ns)
 derive instance ordId :: Ord (Id ns)
 instance Show (Id ns) where show = genericShow
-
-instance encodeJsonId :: IsSymbol ns => Agt.EncodeJson (Id ns)
-  where encodeJson (Id { time, rand }) = Agt.encodeJson (AgtBigInt time /\ AgtBigInt rand)
-instance decodeJsonId :: IsSymbol ns => Agt.DecodeJson (Id ns)
-  where decodeJson = Agt.decodeJson
-                 >>> map (\(AgtBigInt time /\ AgtBigInt rand) -> Id { time, rand })
-                 -- ^^ TODO: when decoding, fail on wrong namespace
 
 foreign import getNow :: Effect BigInt
 foreign import getRand :: BigInt -> Effect BigInt
@@ -132,3 +134,12 @@ instance toPg_Id :: IsSymbol ns => Pg.ToPg (Id ns) where
 
 instance fromPg_Id :: IsSymbol ns => Pg.FromPg (Id ns) where
   impl = Pg.mkImpl parse
+
+
+instance IsSymbol ns => Agt.EncodeJson (Id ns) where
+  encodeJson id = Agt.encodeJson (format id)
+
+instance IsSymbol ns => Agt.DecodeJson (Id ns) where
+  decodeJson json = do
+    str <- Agt.decodeJson json
+    parse str # lmap (Agt.TypeMismatch <<< ("not an id: " <> _))
