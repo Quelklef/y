@@ -27,3 +27,16 @@ array =>
   }
   return array; 
 }
+
+export const download_f =
+name => content => () =>
+{
+  // https://stackoverflow.com/a/18197341
+  var $a = document.createElement('a');
+  $a.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(content));
+  $a.setAttribute('download', name);
+  $a.style.display = 'none';
+  document.body.appendChild($a);
+  $a.click();
+  document.body.removeChild($a);
+};

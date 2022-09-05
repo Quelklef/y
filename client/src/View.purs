@@ -2,6 +2,7 @@ module Y.Client.View (view) where
 
 import Prelude
 
+import Effect (Effect)
 import Data.Map (Map)
 import Data.Map as Map
 import Data.Set (Set)
@@ -23,6 +24,7 @@ import Effect.Ref as Ref
 import Effect.Unsafe (unsafePerformEffect)
 import Control.Alt ((<|>))
 import Partial.Unsafe (unsafePartial)
+import Data.Argonaut.Encode (toJsonString)
 
 import Html (Html)
 import Html as H
@@ -84,6 +86,8 @@ derive instance eqCardOriginal :: Eq CardOriginal
 derive instance ordCardOriginal :: Ord CardOriginal
 
 --
+
+foreign import getTimestampPretty :: Effect String
 
 unsafeFromJust :: forall a. Maybe a -> a
 unsafeFromJust m = unsafePartial $ fromJust m
@@ -307,9 +311,18 @@ view model = { head: headView, body: [bodyView] }
       [ ]
       [ viewLayoutPicker model.layoutName
       , viewNameChanger
+      , H.br []
       , H.button
         [ A.onClick Actions.appendManyMessages ]
         [ H.text "big append (don't press this)" ]
+      , H.br []
+      , H.button
+        [ A.onClick $ Actions.download do
+            dateStr <- getTimestampPretty
+            let name = "conversation-" <> dateStr <> ".json"
+            let content = toJsonString model
+            pure { name, content } ]
+        [ H.text "export conversation" ]
       , viewUnreadMessageQueue
       ]
     ]

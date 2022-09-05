@@ -122,7 +122,7 @@ in {
         lpg do ./pg bash -c 'pg_ctl status || pg_ctl start' || return 1
         purs-nix bundle &&
         Y_DB_CONNECTION_STRING=$(lpg do ./pg bash -c 'echo $LPG_CONNSTR') \
-          node --trace-uncaught ./index.js
+          node --trace-uncaught ./main.js
       )}
 
       function y.server.watch {(

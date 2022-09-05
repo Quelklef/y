@@ -307,3 +307,13 @@ appendManyMessages = appendRandomCard `power` 12
     pure $ model'
 
 foreign import shuffle :: forall a. Array a -> Effect (Array a)
+
+
+-- Downloda a file to the user
+download :: Effect { name :: String, content :: String } -> Action
+download get = Action $ \m -> liftEffect do
+  { name, content } <- get
+  download_f name content
+  pure m
+
+foreign import download_f :: String -> String -> Effect Unit

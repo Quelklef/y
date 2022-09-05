@@ -41,6 +41,7 @@ nixed = shared.purs-nix.purs
         aff
         aff-promise
         postgres
+        quickcheck
       ];
   };
 

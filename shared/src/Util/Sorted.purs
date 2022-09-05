@@ -8,6 +8,10 @@ import Data.Array as Array
 import Data.Foldable (class Foldable, foldl, foldr, foldMap)
 import Data.Functor as Functor
 
+import Data.Generic.Rep (class Generic)
+import Data.Argonaut.Encode as Agt
+import Data.Argonaut.Decode as Agt
+
 -- n.b. This module could be greatly improved, but it works for now
 
 class Functor l <= Sortable l where
@@ -27,6 +31,11 @@ instance sortable_list :: Sortable List where
 
 newtype Sorted :: forall k. (k -> Type) -> k -> Type
 newtype Sorted l a = Sorted (l a)
+
+derive instance Generic (Sorted l a) _
+
+derive newtype instance Agt.EncodeJson (l a) => Agt.EncodeJson (Sorted l a)
+derive newtype instance Agt.DecodeJson (l a) => Agt.DecodeJson (Sorted l a)
 
 instance foldableSorted :: Foldable l => Foldable (Sorted l) where
   foldl f z (Sorted l) = foldl f z l
