@@ -2,14 +2,18 @@ module Y.Shared.Event where
 
 import Prelude
 
+import Control.Alt ((<|>))
 import Data.Tuple.Nested ((/\))
 import Data.Generic.Rep (class Generic)
 import Data.Set (Set)
+import Data.Set as Set
+import Data.Show.Generic (genericShow)
 
 import Data.Argonaut.Encode (class EncodeJson) as Agt
 import Data.Argonaut.Decode (class DecodeJson) as Agt
 import Data.Argonaut.Encode.Generic (genericEncodeJson) as Agt
 import Data.Argonaut.Decode.Generic (genericDecodeJson) as Agt
+import Test.QuickCheck.Arbitrary (class Arbitrary, arbitrary, genericArbitrary)
 
 import Y.Shared.Instant (Instant)
 import Y.Shared.Id (Id)
@@ -62,6 +66,8 @@ data EventPayload
 derive instance eqEvent :: Eq Event
 derive instance genericEvent :: Generic Event _
 
+instance Show Event where show = genericShow
+
 instance ordEvent :: Ord Event where
   compare (Event a) (Event b) =
     let key event = event.time /\ event.id
@@ -69,9 +75,30 @@ instance ordEvent :: Ord Event where
 
 instance encodeJsonEvent :: Agt.EncodeJson Event where encodeJson = Agt.genericEncodeJson
 instance decodeJsonEvent :: Agt.DecodeJson Event where decodeJson = Agt.genericDecodeJson
+instance Arbitrary Event where arbitrary = genericArbitrary
 
 derive instance eqEventPayload :: Eq EventPayload
 derive instance genericEventPayload :: Generic EventPayload _
 
+instance Show EventPayload where show = genericShow
+
 instance encodeJsonEventPayload :: Agt.EncodeJson EventPayload where encodeJson = Agt.genericEncodeJson
 instance decodeJsonEventPayload :: Agt.DecodeJson EventPayload where decodeJson = Agt.genericDecodeJson
+
+instance Arbitrary EventPayload where
+  arbitrary =
+        ((\name userId -> EventPayload_SetName { name, userId })
+            <$> arbitrary <*> arbitrary)
+    <|> ((\messageId depIds timeSent content userId -> EventPayload_MessageSend { messageId, depIds, timeSent, content, userId })
+            <$> arbitrary <*> (arrayToSet <$> arbitrary) <*> arbitrary <*> arbitrary <*> arbitrary)
+    <|> ((\messageId content userId -> EventPayload_MessageEdit { messageId, content, userId })
+            <$> arbitrary <*> arbitrary <*> arbitrary)
+    <|> ((\messageId userId -> EventPayload_MessageDelete { messageId, userId })
+            <$> arbitrary <*> arbitrary)
+    <|> ((\messageId isUnread userId -> EventPayload_MessageSetIsUnread { messageId, isUnread, userId })
+            <$> arbitrary <*> arbitrary <*> arbitrary)
+
+      where
+
+      arrayToSet :: forall a. Ord a => Array a -> Set a
+      arrayToSet = Set.fromFoldable

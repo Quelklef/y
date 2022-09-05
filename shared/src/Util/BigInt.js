@@ -31,3 +31,5 @@ n =>
 };
 export const fromInt = n => BigInt(n);
 export const toInt = b => Number(b);
+
+export const show_f = n => String(n) + 'n';

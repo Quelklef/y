@@ -17,6 +17,8 @@ import Data.Argonaut.Encode (class EncodeJson) as Agt
 import Data.Argonaut.Decode (class DecodeJson) as Agt
 import Data.Argonaut.Encode.Generic (genericEncodeJson) as Agt
 import Data.Argonaut.Decode.Generic (genericDecodeJson) as Agt
+import Test.QuickCheck.Arbitrary (class Arbitrary, genericArbitrary)
+import Data.Show.Generic (genericShow)
 
 import Database.Postgres.ToPg (class ToPg) as Pg
 import Database.Postgres.FromPg (class FromPg, mkImpl) as Pg
@@ -33,6 +35,8 @@ derive instance eqInstant :: Eq Instant
 derive instance ordInstant :: Ord Instant
 
 derive instance genericInstant :: Generic Instant _
+instance Arbitrary Instant where arbitrary = genericArbitrary
+instance Show Instant where show = genericShow
 
 instance encodeJsonInstant :: Agt.EncodeJson Instant where encodeJson = Agt.genericEncodeJson
 instance decodeJsonInstant :: Agt.DecodeJson Instant where decodeJson = Agt.genericDecodeJson

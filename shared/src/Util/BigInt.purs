@@ -7,6 +7,8 @@ module Y.Shared.Util.BigInt
   , pow
   ) where
 
+import Prelude
+
 import Data.Maybe (Maybe(..))
 import Data.Semiring (class Semiring)
 import Data.Ring (class Ring)
@@ -14,6 +16,7 @@ import Data.CommutativeRing (class CommutativeRing)
 import Data.EuclideanRing (class EuclideanRing)
 import Data.Eq (class Eq)
 import Data.Ord (class Ord, Ordering(..))
+import Test.QuickCheck.Arbitrary (class Arbitrary, arbitrary, genericArbitrary)
 
 foreign import data BigInt :: Type
 
@@ -70,3 +73,12 @@ foreign import toInt :: BigInt -> Int
 foreign import fromInt :: Int -> BigInt
 
 foreign import pow :: BigInt -> BigInt -> BigInt
+
+instance Arbitrary BigInt where
+  arbitrary = fromInt <$> arbitrary
+
+
+foreign import show_f :: BigInt -> String
+
+instance Show BigInt where
+  show = show_f

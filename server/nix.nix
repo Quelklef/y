@@ -22,7 +22,8 @@ nixed = shared.purs-nix.purs
     dependencies =
       with shared.purs-nix.ps-pkgs;
       let ns = shared.purs-nix.ps-pkgs-ns; in
-      [ console
+      [
+        console
         effect
         psci-support
         ordered-collections
@@ -47,6 +48,7 @@ nixed = shared.purs-nix.purs
         aff-promise
         filterable
         postgres
+        quickcheck
       ];
 
     foreign."Database.Postgres".node_modules = "${node_modules}/node_modules";
@@ -98,7 +100,9 @@ in {
   shell = pkgs.mkShell {
     buildInputs =
       [ (nixed.command {
-          srcs = [ "$PWD/../server" "$PWD/../shared" ];
+          srcs = [ "$PWD/../server/src" "$PWD/../shared/src" ];
+          test = "$PWD/test";
+          test-module = "Y.Server.Test.Main";
           bundle = purs-nix-bundle-args;
         })
         pkgs.nodejs

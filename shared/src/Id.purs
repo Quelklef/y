@@ -20,6 +20,8 @@ import Data.Traversable (traverse)
 import Data.Foldable (foldl)
 import Partial.Unsafe (unsafePartial)
 import Data.Generic.Rep (class Generic)
+import Data.Show.Generic (genericShow)
+import Test.QuickCheck.Arbitrary (class Arbitrary, genericArbitrary)
 
 import Data.Argonaut.Encode (class EncodeJson, encodeJson) as Agt
 import Data.Argonaut.Decode (class DecodeJson, decodeJson) as Agt
@@ -67,8 +69,12 @@ instance decodeJsonAgtBigInt :: Agt.DecodeJson AgtBigInt
                                               -- TODO: fail on Nothing ^^
 newtype Id (namespace :: Symbol) = Id { time :: BigInt, rand :: BigInt }
 
+derive instance Generic (Id ns) _
+instance Arbitrary (Id ns) where arbitrary = genericArbitrary
+
 derive instance eqId :: Eq (Id ns)
 derive instance ordId :: Ord (Id ns)
+instance Show (Id ns) where show = genericShow
 
 instance encodeJsonId :: IsSymbol ns => Agt.EncodeJson (Id ns)
   where encodeJson (Id { time, rand }) = Agt.encodeJson (AgtBigInt time /\ AgtBigInt rand)
