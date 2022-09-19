@@ -30,7 +30,7 @@ import Html (Html)
 import Html as H
 import Css as S
 import Attribute as A
-import WHATWG.HTML.KeyboardEvent (toMaybeKeyboardEvent, shiftKey, key) as Wwg
+import WHATWG.HTML.KeyboardEvent (toMaybeKeyboardEvent, ctrlKey, key) as Wwg
 import WHATWG.DOM.Event (stopPropagation) as Wwg
 
 import Y.Shared.Instant (Instant, asMilliseconds)
@@ -451,7 +451,7 @@ view model = { head: headView, body: [bodyView] }
                   Wwg.stopPropagation keyEvent
                   let trimmed = draft { content = String.trim draft.content }
                       ok = Wwg.key keyEvent == "Enter"
-                           && Wwg.shiftKey keyEvent
+                           && Wwg.ctrlKey keyEvent
                            && trimmed.content /= ""
                       action = guard ok $ Actions.sendMessage trimmed
                   pure $ Just action
