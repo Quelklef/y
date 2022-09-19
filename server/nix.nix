@@ -118,6 +118,8 @@ in {
 
       root=$PWD
 
+      export LC_ALL='C.UTF8'
+
       function y.server.run {(
         cd $root
         [ -d ./pg ] || lpg make ./pg
