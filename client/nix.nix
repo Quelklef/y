@@ -78,6 +78,7 @@ in {
         bundle = purs-nix-bundle-args;
       })
       pkgs.python3
+      pkgs.entr
     ];
 
     shellHook = ''
