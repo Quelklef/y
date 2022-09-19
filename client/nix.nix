@@ -1,8 +1,10 @@
-{ pkgs ? import <nixpkgs> {} }:
+{ system ? builtins.currentSystem }:
 
 let
 
-shared = import ../shared/nix.nix { inherit pkgs; };
+shared = import ../shared/nix.nix { inherit system; };
+
+pkgs = shared.pkgs;
 
 nixed = shared.purs-nix.purs
   { srcs = [ ../client ../shared ];

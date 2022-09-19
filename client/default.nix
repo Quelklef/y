@@ -1,2 +1,2 @@
-{ pkgs ? import <nixpkgs> {} }:
-(import ./nix.nix { inherit pkgs; }).deriv
+{ system ? builtins.currentSystem }:
+(import ./nix.nix { inherit system; }).deriv
