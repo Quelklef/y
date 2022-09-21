@@ -120,10 +120,19 @@ in {
 
       export LC_ALL='C.UTF8'
 
-      function y.server.run {(
+      function y.server.db.start {(
         cd $root
         [ -d ./pg ] || lpg make ./pg
         lpg do ./pg bash -c 'pg_ctl status || pg_ctl start' || return 1
+      )}
+
+      function y.server.db.stop {(
+        cd $root
+        lpg do ./pg pg_ctl stop
+      )}
+
+      function y.server.run {(
+        y.server.db.start
         purs-nix bundle &&
         Y_DB_CONNECTION_STRING=$(lpg do ./pg bash -c 'echo $LPG_CONNSTR') \
           node --trace-uncaught ./main.js
@@ -133,6 +142,7 @@ in {
         cd $root
         export root
         export -f y.server.run
+        export -f y.server.db.start
         git ls-files .. | xargs realpath | grep -E 'server|shared' | entr -csr y.server.run
       )}
 
