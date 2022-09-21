@@ -184,6 +184,13 @@ focusDraftTextareaAfterRender draftId = do
   setTimeout0 do
     focusElementById textareaId
 
+focusCard :: Id "Message" -> Effect Unit
+focusCard cardId = do
+  -- same comments as `focusDraftTextareaAfterRender` presumably
+  let cardDomId = "card-" <> (Id.format cardId)
+  setTimeout0 do
+     focusElementById cardDomId
+
 foreign import setTimeout0 :: forall a. Effect a -> Effect Unit
 foreign import focusElementById :: String -> Effect Unit
 
@@ -191,8 +198,8 @@ editDraft :: Id "Message" -> String -> Action
 editDraft draftId text = Action \model -> do
   pure $ model { drafts = model.drafts # Set.map (\draft -> if draft.id == draftId then draft { content = text } else draft) }
 
-sendMessage :: Draft -> Action
-sendMessage draft = Action \model -> do
+sendMessageAndFocusCard :: Draft -> Action
+sendMessageAndFocusCard draft = Action \model -> do
   now <- liftEffect getNow
   eventId <- liftEffect Id.new
   let event = Event
@@ -208,6 +215,8 @@ sendMessage draft = Action \model -> do
           }
         }
   model' <- unAction (sendEvent event) model
+
+  liftEffect $ focusCard draft.id
 
   pure $ model' { drafts = model.drafts # Set.filter (\d -> d.id /= draft.id) }
 

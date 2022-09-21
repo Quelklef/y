@@ -355,6 +355,8 @@ view model = { head: headView, body: [bodyView] }
     ]
     [ guard (isSelected card) $ A.addClass "colorshift"
     , A.onClick $ Actions.setFocused card.id
+    , A.id $ "card-" <> Id.format card.id
+    , A.tabindex "0"
     ]
     [ case card.original of
         CardOriginal_Draft _ -> mempty
@@ -453,7 +455,7 @@ view model = { head: headView, body: [bodyView] }
                       ok = Wwg.key keyEvent == "Enter"
                            && Wwg.ctrlKey keyEvent
                            && trimmed.content /= ""
-                      action = guard ok $ Actions.sendMessage trimmed
+                      action = guard ok $ Actions.sendMessageAndFocusCard trimmed
                   pure $ Just action
             ]
           _ -> mempty
