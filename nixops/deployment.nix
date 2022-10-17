@@ -45,8 +45,8 @@ y-client-mason =
     src = pkgs.fetchFromGitHub {
       owner = "ursi";
       repo = "y-client";
-      rev = "d1a1d17efbe125f0508961e19af32d322a47c6cf";
-      sha256 = "sha256-sxQnnMwM6v2tHzD6Ku6v7wkysWXGms6CRga2dwc8sWY=";
+      rev = "c290b9ee14a913c906fd0ad1783343ce0007c18b";
+      sha256 = "sha256-Su/JN0EdJit42S62KTXjZkDfvazHN4jg+e+Vmch1cxU=";
     };
   in pkgs.stdenv.mkDerivation {
     name = "y-client-mason";
