@@ -40,6 +40,23 @@ y =
 y-client = with-uglified "main.js" (import (y + /client/default.nix) { });
 y-server = import (y + /server/default.nix) { };
 
+y-client-mason =
+  let
+    src = pkgs.fetchFromGitHub {
+      owner = "ursi";
+      repo = "y-client";
+      rev = "d1a1d17efbe125f0508961e19af32d322a47c6cf";
+      sha256 = "sha256-sxQnnMwM6v2tHzD6Ku6v7wkysWXGms6CRga2dwc8sWY=";
+    };
+  in pkgs.stdenv.mkDerivation {
+    name = "y-client-mason";
+    inherit src;
+    installPhase = ''
+      mkdir $out
+      cp $src/{index.html,main.js} $out
+    '';
+  };
+
 host = if toProd then "165.227.67.28" else "165.22.46.18";
 hostname = if toProd then "y.maynards.site" else "pre.y.maynards.site";
 description = if toProd then "Y" else "Y staging server";
@@ -82,6 +99,11 @@ in
           locations."= /version".extraConfig = ''
             return 200 '${if y-version == "use-local" then "working dir" else y-version.rev}';
             add_header Content-Type text/plain;
+          '';
+
+          locations."/mason/".extraConfig = ''
+            alias ${y-client-mason}/;
+            try_files $uri $uri/ =404;
           '';
         };
       };
