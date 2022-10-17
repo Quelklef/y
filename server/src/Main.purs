@@ -63,15 +63,25 @@ mkState0 db =
 
 -- | Which clients are interested in the given event?
 getInterestedClients :: forall l. Filterable l => State -> Event -> l Client -> l Client
-getInterestedClients state (Event event) universe =
-  case event.payload of
-    EventPayload_SetName _ -> universe
-    EventPayload_MessageSend _ -> universe
-    EventPayload_MessageEdit _ -> universe
-    EventPayload_MessageDelete _ -> universe
-    EventPayload_MessageSetIsUnread { userId } ->
-      let isInterested client = state.clientUserIds # Map.lookup client.id # map (_ == userId) # fromMaybe false
-      in filter isInterested universe
+getInterestedClients state (Event event) =
+  let
+
+    isSubbedTo :: Id "Room" -> (Client -> Boolean)
+    isSubbedTo roomId client = Relation.has client.id roomId state.subs
+
+    isUser :: Id "User" -> (Client -> Boolean)
+    isUser userId client = state.clientUserIds # Map.lookup client.id # map (_ == userId) # fromMaybe false
+
+    conj p1 p2 x = p1 x && p2 x
+
+    predicate = case event.payload of
+        EventPayload_SetName _                     -> isSubbedTo event.roomId
+        EventPayload_MessageSend _                 -> isSubbedTo event.roomId
+        EventPayload_MessageEdit _                 -> isSubbedTo event.roomId
+        EventPayload_MessageDelete _               -> isSubbedTo event.roomId
+        EventPayload_MessageSetIsUnread { userId } -> isSubbedTo event.roomId # conj (isUser userId)
+
+    in filter predicate
 
 onTransmission :: Client -> Transmission.ToServer -> State -> Aff State
 onTransmission = \client tn -> case tn of
