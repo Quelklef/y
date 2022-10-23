@@ -36,8 +36,8 @@ purescript-postgres = purs-nix-base.build
     src.path = pkgs.fetchFromGitHub
       { owner = "quelklef";
         repo = "purescript-postgres";
-        rev = "cec8d32b614719bb21b7622dbd2d2fdb051fefcf";
-        sha256 = "1a5pnv61fblm6xg4kfmlmbxbzni4hnd2pcl7kkd2jxzqgjhvan4f";
+        rev = "8eb2221e763970d2c6ccf0102e2106de6533e2e4";
+        sha256 = "sha256-uyiH6VDe2EAveX4n1WLuYJSNLwMAKzG64B3C/kGwjrY=";
       };
   };
 
