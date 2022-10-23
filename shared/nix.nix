@@ -25,21 +25,28 @@ purs-nix-base =
     (pkgs.fetchFromGitHub
       { owner = "ursi";
         repo = "purs-nix";
-        rev = "18c1cae603b876c62515b7e4a3d4b587119e006b";
-        sha256 = "0v78qgn0pdpmyy2wmyv0cig9mdflkcmaydgjqr6rxs4x3h1y4brv";
+        rev = "66427405d2a3e0c2491646a6efc1716ce3731f3d";
+        sha256 = "sha256-aArvsmkMc+LF2wEdLryiX/kqzMjtLsbcniIuSfFKgxg=";
       }
     ) { inherit system; };
 
-purescript-postgres = purs-nix-base.build
-  { name = "purescript-postgres";
-    info = {};
-    src.path = pkgs.fetchFromGitHub
+purescript-postgres = let
+
+  src =
+    pkgs.fetchFromGitHub
       { owner = "quelklef";
         repo = "purescript-postgres";
-        rev = "8eb2221e763970d2c6ccf0102e2106de6533e2e4";
-        sha256 = "sha256-uyiH6VDe2EAveX4n1WLuYJSNLwMAKzG64B3C/kGwjrY=";
+        rev = "a4945f1636d1360f062f47fc3416f6833f3d9715";
+        sha256 = "sha256-lZEtYpunWlaQ6uln5kTAq1IdWE3Xw5RFIEw7XOZyIKg=";
       };
-  };
+
+  in purs-nix-base.build
+    { name = "purescript-postgres";
+      info = import "${src}/package.nix" { ps-pkgs = purs-nix.ps-pkgs; };
+        # ^ hack to get around the fact that purs-nix doesn't properly handle
+        #   the case when your package.nix imports another file
+      src.path = src;
+    };
 
 purs-nix =
   let

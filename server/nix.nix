@@ -63,7 +63,7 @@ purs-nix-bundle-args = {
       [ "pg-native" ]
         # ^ node library underlying purescript-postgres needs this
         #   seems to require() a dep it doesn't actually use ..?
-      ++ [ "pg" "ws" ];
+      ++ [ "ws" ];
         # ^ uhhhh the nix-build needs these and idk why...
   };
 };
@@ -133,9 +133,8 @@ in {
 
       function y.server.run {(
         y.server.db.start
-        purs-nix bundle &&
         Y_DB_CONNECTION_STRING=$(lpg do ./pg bash -c 'echo $LPG_CONNSTR') \
-          node --trace-uncaught ./main.js
+          purs-nix run
       )}
 
       function y.server.watch {(
