@@ -94,3 +94,10 @@ send =>
 
   return cancel;
 };
+
+export const setTimeout0 =
+f =>
+() =>
+{
+  setTimeout(f, 0);
+};

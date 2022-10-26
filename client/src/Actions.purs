@@ -26,7 +26,7 @@ import Y.Shared.Event (Event(..), EventPayload(..))
 import Y.Shared.Transmission as Transmission
 
 import Y.Client.Core (Model, Draft)
-import Y.Client.Action (Action(..), unAction)
+import Y.Client.Action (Action(..), afterRender, unAction)
 import Y.Client.WebSocket as Ws
 
 noop :: Action
@@ -186,10 +186,8 @@ focusDraftTextareaAfterRender draftId = do
 
 focusCard :: Id "Message" -> Effect Unit
 focusCard cardId = do
-  -- same comments as `focusDraftTextareaAfterRender` presumably
   let cardDomId = "card-" <> (Id.format cardId)
-  setTimeout0 do
-     focusElementById cardDomId
+  focusElementById cardDomId
 
 foreign import setTimeout0 :: forall a. Effect a -> Effect Unit
 foreign import focusElementById :: String -> Effect Unit
@@ -216,7 +214,7 @@ sendMessageAndFocusCard draft = Action \model -> do
         }
   model' <- unAction (sendEvent event) model
 
-  liftEffect $ focusCard draft.id
+  _ <- afterRender $ focusCard draft.id
 
   pure $ model' { drafts = model.drafts # Set.filter (\d -> d.id /= draft.id) }
 

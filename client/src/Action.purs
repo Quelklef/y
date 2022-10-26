@@ -2,11 +2,14 @@ module Y.Client.Action where
 
 import Prelude
 
+import Data.Tuple.Nested (type (/\))
+
 import Effect (Effect)
 import Effect.Class (class MonadEffect)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Reader.Trans (ReaderT, runReaderT)
 import Control.Monad.Reader.Class (class MonadAsk, ask)
+import Control.Monad.Writer.Trans (WriterT, runWriterT, tell)
 
 import Y.Client.Core (Model, Y_Ws_Client)
 
@@ -26,17 +29,27 @@ instance semigroupAction :: Semigroup Action where
 instance monoidAction :: Monoid Action where
   mempty = Action pure
 
-newtype ActionMonad a = ActionMonad (ReaderT ActionAnswer Effect a)
+newtype AfterRenderEffect = AfterRenderEffect (Effect Unit)
+newtype ActionMonad a = ActionMonad (ReaderT ActionAnswer (WriterT AfterRenderEffect Effect) a)
+
+instance Semigroup AfterRenderEffect where
+  append (AfterRenderEffect a1) (AfterRenderEffect a2) = AfterRenderEffect do
+     _ <- a1
+     _ <- a2
+     (pure unit)
+
+instance Monoid AfterRenderEffect where
+  mempty = AfterRenderEffect (pure unit)
 
 type ActionAnswer =
   { wsClient :: Y_Ws_Client
   }
 
-runAction :: ActionAnswer -> Action -> (Model -> Effect Model)
+runAction :: ActionAnswer -> Action -> (Model -> Effect (Model /\ AfterRenderEffect))
 runAction answer (Action action) model =
-  case action model of ActionMonad mr -> runReaderT mr answer
+  case (action model) of ActionMonad mr -> runWriterT (runReaderT mr answer)
 
-unActionMonad :: forall a. ActionMonad a -> ReaderT ActionAnswer Effect a
+unActionMonad :: forall a. ActionMonad a -> ReaderT ActionAnswer (WriterT AfterRenderEffect Effect) a
 unActionMonad (ActionMonad r) = r
 
 instance bindActionMonad :: Bind ActionMonad where
@@ -57,7 +70,12 @@ instance applicativeActionMonad :: Applicative ActionMonad where
 instance monadActionMonad :: Monad ActionMonad
 
 instance monadEffectActionMonad :: MonadEffect ActionMonad where
-  liftEffect ef = ActionMonad (lift ef)
+  liftEffect ef = ActionMonad (lift (lift ef))
 
 instance monadReaderActionMonad :: MonadAsk ActionAnswer ActionMonad where
   ask = ActionMonad ask
+
+afterRender :: Effect Unit -> ActionMonad Unit
+afterRender effect =
+  let (writer :: WriterT AfterRenderEffect Effect Unit) = tell (AfterRenderEffect effect)
+  in ActionMonad $ lift $ writer
