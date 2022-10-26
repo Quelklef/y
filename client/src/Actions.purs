@@ -26,7 +26,7 @@ import Y.Shared.Event (Event(..), EventPayload(..))
 import Y.Shared.Transmission as Transmission
 
 import Y.Client.Core (Model, Draft)
-import Y.Client.Action (Action(..), unAction)
+import Y.Client.Action (Action(..), afterRender, unAction)
 import Y.Client.WebSocket as Ws
 
 noop :: Action
@@ -158,38 +158,27 @@ createDraft = Action \model -> do
         , drafts = model.drafts <> Set.singleton draft
         }
 
-  liftEffect $ focusDraftTextareaAfterRender draft.id
+  _ <- afterRender $ focusDraftTextarea draft.id
 
   pure newModel
 
-focusDraftTextareaAfterRender :: Id "Message" -> Effect Unit
-focusDraftTextareaAfterRender draftId = do
-  -- Set the focus to the textarea once the draft has been rendered
-  -- The implementation here is basically a giant hack:
-  -- 1) We use setTimeout(, 0) to perform the .focus() after the render
-  --    Instead, we should use Elmish's afterRender. But I didn't want to
-  --    go through the effort to make Cmd available to the program, since:
-  --    a) Mason says Cmd needs reworking anyway;
-  --    b) Even if I did, this implementation would still be a huge
-  --       hack ANYWAY, because:
-  -- 2) We retrieve the textare element via .getElementById("textarea-for-" + draftId).
-  --    This is bad because it splits the logic into two independent parts: one,
-  --    assigning the element id, which is in the view, and two, actually calling .focus(),
-  --    which is here. These two parts are entirely separate within the code base, far
-  --    apart, and can be edited and/or removed independent of each other other, without
-  --    complaint from the compiler, all despite consisting of a single conceptual unit.
-  --    Yuck.
-  -- This function should be reimplemented.
+-- TODO The `focus*` functions should be reimplemented:
+-- We retrieve the elements via `getElementById()`. This is bad because it splits the
+-- logic into two independent parts: one, assigning the element id, which is in the
+-- view, and two, actually calling `focus()`, which is here. These two parts are
+-- entirely separate within the code base, far apart, and can be edited and/or removed
+-- independent of each other other, without complaint from the compiler, all despite
+-- consisting of a single conceptual unit. Yuck.
+
+focusDraftTextarea :: Id "Message" -> Effect Unit
+focusDraftTextarea draftId = do
   let textareaId = "textarea-for-" <> (Id.format draftId)
-  setTimeout0 do
-    focusElementById textareaId
+  focusElementById textareaId
 
 focusCard :: Id "Message" -> Effect Unit
 focusCard cardId = do
-  -- same comments as `focusDraftTextareaAfterRender` presumably
   let cardDomId = "card-" <> (Id.format cardId)
-  setTimeout0 do
-     focusElementById cardDomId
+  focusElementById cardDomId
 
 foreign import setTimeout0 :: forall a. Effect a -> Effect Unit
 foreign import focusElementById :: String -> Effect Unit
@@ -216,7 +205,7 @@ sendMessageAndFocusCard draft = Action \model -> do
         }
   model' <- unAction (sendEvent event) model
 
-  liftEffect $ focusCard draft.id
+  _ <- afterRender $ focusCard draft.id
 
   pure $ model' { drafts = model.drafts # Set.filter (\d -> d.id /= draft.id) }
 

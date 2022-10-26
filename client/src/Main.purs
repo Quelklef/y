@@ -19,7 +19,7 @@ import Y.Shared.Transmission as Transmission
 
 import Y.Client.App (runApp)
 import Y.Client.Core (mkInitialModel, Y_Ws_Client)
-import Y.Client.Action (Action(..), runAction)
+import Y.Client.Action (Action(..), AfterRenderEffect(..), runAction)
 import Y.Client.Actions as Actions
 import Y.Client.View (view)
 import Y.Client.WebSocket as Ws
@@ -93,7 +93,12 @@ main = do
     { initialModel: initialModel
     , subscriptions: const subs
     , view: view
-    , interpret: runAction { wsClient }
+    , interpret: \action model -> do
+        (model' /\ afterRenderEffect) <- runAction { wsClient } action model
+        let (AfterRenderEffect e) = afterRenderEffect
+        -- TODO kind of a hack, abusing `setTimeout` to move effect to after render
+        _ <- setTimeout0 do e
+        pure model'
     }
 
   -- Kick the thing off!
@@ -102,3 +107,5 @@ main = do
     wsClient # Ws.transmit (Transmission.ToServer_Hello { userId })
     wsClient # Ws.transmit (Transmission.ToServer_Subscribe { roomId })
     wsClient # Ws.transmit (Transmission.ToServer_Pull { roomId })
+
+foreign import setTimeout0 :: forall a. Effect a -> Effect Unit
