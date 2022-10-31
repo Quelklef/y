@@ -133,6 +133,11 @@ view model = { head: headView, body: [bodyView] }
     CardOriginal_Draft _ -> true
     CardOriginal_Message _ -> false
 
+  cardToMaybeMessage :: Card -> Maybe Message
+  cardToMaybeMessage card = case card.original of
+    CardOriginal_Message message -> Just message
+    CardOriginal_Draft _ -> Nothing
+
   calcDims'cached :: Card -> { width :: Number, height :: Number }
   calcDims'cached =
     let dimsCache = global "QdyjNN4JModpDGXRLgZn" $ Lazy.defer \_ -> unsafePerformEffect $ Ref.new Map.empty
@@ -536,12 +541,12 @@ view model = { head: headView, body: [bodyView] }
       unreadMessages =
           model.unreadMessageIds
           # (Set.toUnfoldable :: Set ~> Array)
-          # (let redundant id = let depIds = (unsafeFromJust $ getCard id).depIds
-                                in depIds /= mempty && all isUnread depIds
-             in Array.filter $ not <<< redundant)
-          # map getMessage
+          # map (getCard >=> cardToMaybeMessage)
           # Array.catMaybes
-          # Array.sortBy (comparing $ \msg -> msg.timeSent /\ msg.id)
+          # (let redundant message = let depIds = message.depIds
+                                     in depIds /= mempty && all isUnread depIds
+             in Array.filter $ not <<< redundant)
+          # Array.sortBy (comparing $ \message -> message.timeSent /\ message.id)
     in
     guard (unreadMessages /= mempty) $
     H.divS
