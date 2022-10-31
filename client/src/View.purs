@@ -241,37 +241,40 @@ view model = { head: headView, body: [bodyView] }
               guard (Wwg.key keyEvent == "Enter") (Just Actions.createDraft)
 
             Just focusedCard ->
-              -- send/create draft on (shift-)enter
-              if Wwg.key keyEvent == "Enter" then
-                case focusedCard.original of
-                  CardOriginal_Message _ -> Just Actions.createDraft
-                  _ -> Nothing
+              case (isDraft focusedCard) of
+                true -> Nothing
+                false ->
+                  -- send/create draft on (shift-)enter
+                  if Wwg.key keyEvent == "Enter" then
+                    case focusedCard.original of
+                      CardOriginal_Message _ -> Just Actions.createDraft
+                      _ -> Nothing
 
-              -- Select card on E
-              else if Wwg.key keyEvent == "e" then
-                Just $ Actions.setSelected focusedCard.id (not $ isSelected focusedCard)
+                  -- Select card on E
+                  else if Wwg.key keyEvent == "e" then
+                    Just $ Actions.setSelected focusedCard.id (not $ isSelected focusedCard)
 
-              -- Mark read/unread on R
-              else if Wwg.key keyEvent == "r" then
-                Just $ Actions.setIsUnread focusedCard.id (not $ isUnread focusedCard.id)
+                  -- Mark read/unread on R
+                  else if Wwg.key keyEvent == "r" then
+                    Just $ Actions.setIsUnread focusedCard.id (not $ isUnread focusedCard.id)
 
-              -- arrow key controls
-              else if Wwg.key keyEvent == "ArrowUp" then
-                case Set.toUnfoldable focusedCard.depIds of
-                  [id] -> Just $ Actions.setFocused id
-                  _ -> Nothing
+                  -- arrow key controls
+                  else if Wwg.key keyEvent == "ArrowUp" then
+                    case Set.toUnfoldable focusedCard.depIds of
+                      [id] -> Just $ Actions.setFocused id
+                      _ -> Nothing
 
-              else if ["ArrowLeft", "ArrowRight", "ArrowDown"] # Array.elem (Wwg.key keyEvent) then
-                let replies = Set.toUnfoldable (getReplies focusedCard.id) # Array.sortBy (comparing _.time)
-                in [ "ArrowLeft" /\ { to: 0 }
-                   , "ArrowDown" /\ { to: length replies / 2 }
-                   , "ArrowRight" /\ { to: length replies - 1 }
-                   ]
-                   # foldMap \(key /\ { to }) ->
-                      guard (Wwg.key keyEvent == key) $
-                      replies Array.!! to # foldMap (_.id >>> Actions.setFocused >>> Just)
+                  else if ["ArrowLeft", "ArrowRight", "ArrowDown"] # Array.elem (Wwg.key keyEvent) then
+                    let replies = Set.toUnfoldable (getReplies focusedCard.id) # Array.sortBy (comparing _.time)
+                    in [ "ArrowLeft" /\ { to: 0 }
+                       , "ArrowDown" /\ { to: length replies / 2 }
+                       , "ArrowRight" /\ { to: length replies - 1 }
+                       ]
+                       # foldMap \(key /\ { to }) ->
+                          guard (Wwg.key keyEvent == key) $
+                          replies Array.!! to # foldMap (_.id >>> Actions.setFocused >>> Just)
 
-              else Nothing
+                  else Nothing
     ]
     [ H.divS
       [ S.position "absolute"
