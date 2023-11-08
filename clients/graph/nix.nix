@@ -2,12 +2,12 @@
 
 let
 
-shared = import ../shared/nix.nix { inherit system; };
+shared = import ../../shared/nix.nix { inherit system; };
 
 pkgs = shared.pkgs;
 
 nixed = shared.purs-nix.purs
-  { srcs = [ ../client ../shared ];
+  { srcs = [ ./. ../../shared ];
     dependencies =
       with shared.purs-nix.ps-pkgs;
       let ns = shared.purs-nix.ps-pkgs-ns; in
@@ -74,7 +74,7 @@ in {
   shell = pkgs.mkShell {
     buildInputs = [
       (nixed.command {
-        srcs = [ "$PWD/../client" "$PWD/../shared" ];
+        srcs = [ "$PWD" "$PWD/../../shared" ];
         bundle = purs-nix-bundle-args;
       })
       pkgs.python3
@@ -83,7 +83,7 @@ in {
 
     shellHook = ''
 
-      ${shared.mk-shellhook { dir = "client"; }}
+      ${shared.mk-shellhook { dir = "clients/graph"; }}
 
       root=$PWD
 
