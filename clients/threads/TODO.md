@@ -1,0 +1,7 @@
+- some way to pin messages
+- some way to give context to threads instead of just the last message
+- message searching
+- make links clickable
+- make clicking on a notification go to its thread
+- message links
+- one-offs shouldn't be shown if they're replies to messages that haven't been read yet
