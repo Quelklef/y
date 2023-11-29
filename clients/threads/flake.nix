@@ -29,6 +29,55 @@
 
            y = fetchGit { url = y-repo.repo; inherit (y-repo) rev; };
 
+           postgres-pkg = build {
+              name = "postgres";
+
+              src.git =
+                { repo = "https://github.com/Quelklef/purescript-postgres.git";
+                  rev = "cec8d32b614719bb21b7622dbd2d2fdb051fefcf";
+                };
+
+              info.dependencies =
+                with ps-pkgs;
+                [ aff
+                  effect
+                  lists
+                  arrays
+                  maybe
+                  either
+                  aff
+                  aff-promise
+                  argonaut-core
+                  argonaut-codecs
+                  argonaut-generic
+                  spec  # actually
+               ];
+            };
+
+           y-shared-pkg = build {
+             name = "y-shared";
+             src.git = { inherit (y-repo) repo rev; };
+             info =
+               { src = "shared/src";
+                 dependencies =
+                   with ps-pkgs;
+                   [ argonaut-generic
+                     console
+                     postgres-pkg
+                     quickcheck
+                   ];
+               };
+           };
+
+           websocket-pkg = build {
+             name = "websocket";
+             src.git = { inherit (y-repo) repo rev; };
+             info =
+               { src = "shared/src";
+                 install = "mkdir $out; cp client/src/WebSocket.* $out";
+               };
+           };
+
            inherit
              (purs
                 { dependencies =
@@ -37,57 +86,8 @@
                     [ stringutils
                       ursi.elmish
                       ursi.prelude
-                      (build
-                         { name = "y-shared";
-                           src.git = { inherit (y-repo) repo rev; };
-
-                           info =
-                             { src = "shared/src";
-
-                               dependencies =
-                                 with ps-pkgs;
-                                 [ argonaut-generic
-                                   console
-                                   (build
-                                      { name = "postgres";
-
-                                        src.git =
-                                          { repo = "https://github.com/Quelklef/purescript-postgres.git";
-                                            rev = "cec8d32b614719bb21b7622dbd2d2fdb051fefcf";
-                                          };
-
-                                        info.dependencies =
-                                          with ps-pkgs;
-                                          [ aff
-                                            effect
-                                            lists
-                                            arrays
-                                            maybe
-                                            either
-                                            aff
-                                            aff-promise
-                                            argonaut-core
-                                            argonaut-codecs
-                                            argonaut-generic
-                                            spec  # actually
-                                         ];
-                                      }
-                                   )
-                                   quickcheck
-                                 ];
-                             };
-                         }
-                      )
-                      (build
-                         { name = "websocket";
-                           src.git = { inherit (y-repo) repo rev; };
-
-                           info =
-                             { src = "shared/src";
-                               install = "mkdir $out; cp client/src/WebSocket.* $out";
-                             };
-                         }
-                      )
+                      y-shared-pkg
+                      websocket-pkg
                     ];
                 }
              )
