@@ -22,6 +22,19 @@
 
            inherit (purs-nix) build ps-pkgs ps-pkgs-ns purs;
 
+           mation-pkg =
+             purs-nix.build {
+               name = "mation";
+               info = /package.nix;
+               src.path =
+                 pkgs.fetchFromGitHub
+                   { owner = "quelklef";
+                     repo = "mation";
+                     rev = "425bba4ac9939aee2998518063e90a8a6e23271d";
+                     sha256 = "1s5kqf2rs8ll8bql65hvddk2fgrfpamb8kczcd22mrxkizmz9rln";
+                   };
+             };
+
            y-repo =
              { repo = "https://github.com/Quelklef/y.git";
                rev = "4422547a0a484737b4f3e97410c4c893d2d130fc";
@@ -39,18 +52,17 @@
 
               info.dependencies =
                 with ps-pkgs;
-                [ aff
+                [
+                  aff
+                  aff-promise
                   effect
                   lists
                   arrays
                   maybe
                   either
-                  aff
-                  aff-promise
                   argonaut-core
                   argonaut-codecs
                   argonaut-generic
-                  spec  # actually
                ];
             };
 
@@ -88,6 +100,11 @@
                       ursi.prelude
                       y-shared-pkg
                       websocket-pkg
+                      mation-pkg
+
+                      # fake deps to hack around purs-nix only
+                      # accepting a `build`'t package if it's top-level
+                      postgres-pkg
                     ];
                 }
              )
