@@ -3,14 +3,36 @@
 let
 
 shared = import ../../shared/nix.nix { inherit system; };
+inherit (shared) pkgs purescript-postgres-pkg get-flake;
 
-pkgs = shared.pkgs;
+purs-nix =
+  get-flake
+    (pkgs.fetchFromGitHub
+      { owner = "ursi";
+        repo = "purs-nix";
+        rev = "8729b7fbb02822df3fb3988bae94b276e50ca6fc";
+        sha256 = "09bkggxiq7mc6yimg33g8mmncxs9xns7agz99ahxy5w3y3l63hkf";
+      }
+    ) { inherit system; };
 
-nixed = shared.purs-nix.purs
+mation-pkg =
+  purs-nix.build {
+    name = "mation";
+    info = /package.nix;
+    src.path =
+      pkgs.fetchFromGitHub
+        { owner = "quelklef";
+          repo = "mation";
+          rev = "425bba4ac9939aee2998518063e90a8a6e23271d";
+          sha256 = "1s5kqf2rs8ll8bql65hvddk2fgrfpamb8kczcd22mrxkizmz9rln";
+        };
+  };
+
+nixed = purs-nix.purs
   { srcs = [ ./. ../../shared ];
     dependencies =
-      with shared.purs-nix.ps-pkgs;
-      let ns = shared.purs-nix.ps-pkgs-ns; in
+      with purs-nix.ps-pkgs;
+      let ns = purs-nix.ps-pkgs-ns; in
       [ console
         effect
         psci-support
@@ -42,8 +64,9 @@ nixed = shared.purs-nix.purs
         random
         aff
         aff-promise
-        postgres
+        purescript-postgres-pkg
         quickcheck
+        mation-pkg
       ];
   };
 

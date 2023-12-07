@@ -30,7 +30,7 @@ purs-nix-base =
       }
     ) { inherit system; };
 
-purescript-postgres = let
+purescript-postgres-pkg = let
 
   src =
     pkgs.fetchFromGitHub
@@ -52,7 +52,7 @@ purs-nix =
   let
     original = purs-nix-base;
     # add purescript-postgres to the package set
-    patched = original // { ps-pkgs = original.ps-pkgs // { postgres = purescript-postgres; }; };
+    patched = original // { ps-pkgs = original.ps-pkgs // { postgres = purescript-postgres-pkg; }; };
 
   in patched;
 
@@ -62,4 +62,4 @@ mk-shellhook = { dir }: ''
   [[ $(type -t ps1_push) == function ]] && ps1_push "y/${dir} "
 '';
 
-in { inherit pkgs purs-nix mk-shellhook; }
+in { inherit pkgs get-flake purs-nix purescript-postgres-pkg mk-shellhook; }

@@ -25,6 +25,9 @@ import Y.Client.View (view)
 import Y.Client.WebSocket as Ws
 import Y.Client.ToSub (websocketClientToSub, MorallySub, morallySubToSub)
 
+import Mation as M
+import Mation.Elems as E
+
 foreign import localStorage_ ::
   { has :: String -> Effect Boolean
   , get :: String -> Effect String
@@ -72,6 +75,8 @@ main = do
   wsTarget <- getWsTarget
   (wsClient :: Y_Ws_Client) <- Ws.newConnection { url: wsTarget }
 
+  {-
+
   -- apply hacky workaround regarding element focus
   workaround_redirectFocusFromBodyToRoot
 
@@ -100,6 +105,23 @@ main = do
         _ <- setTimeout0 do e
         pure model'
     }
+
+  -}
+
+  M.runApp
+    { root: M.underBody
+    , initial: initialModel
+    , daemon: \_ -> pure unit
+    , render: \_ ->
+        E.div
+        []
+        [ E.p
+          []
+          [ E.text "Hello, Beela"
+          ]
+        ]
+    }
+
 
   -- Kick the thing off!
   wsClient # Ws.onOpen do

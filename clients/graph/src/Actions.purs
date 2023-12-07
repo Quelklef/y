@@ -29,6 +29,9 @@ import Y.Client.Core (Model, Draft)
 import Y.Client.Action (Action(..), afterRender, unAction)
 import Y.Client.WebSocket as Ws
 
+import Data.Lens (over)
+import Mation.Lenses (field)
+
 noop :: Action
 noop = Action pure
 
@@ -60,30 +63,28 @@ fromEvent = \(Event event) -> Action \model -> pure $
             EventPayload_MessageEdit { userId } -> userId
             EventPayload_MessageDelete { userId } -> userId
             EventPayload_MessageSetIsUnread { userId } -> userId
-      in model { userIdToFirstEventTime = model.userIdToFirstEventTime # Map.insert uid event.time }
+      in model # over (field @"derived" <<< field @"userIdToFirstEventTime")
+                      (Map.insert uid event.time)
 
     patch'eventSpecific :: Model -> Model
     patch'eventSpecific model =
       case event.payload of
         EventPayload_SetName pl ->
-          model { userNames = model.userNames # Map.insert pl.userId pl.name }
+          model # over (field @"userNames") (Map.insert pl.userId pl.name)
 
         EventPayload_MessageSend pl ->
-          model { messages =
-                    model.messages # Set.insert
+          model
+            # over (field @"derived" <<< field @"messages")
+                   (Set.insert  
                       { id: pl.messageId
                       , timeSent: pl.timeSent
                       , authorId: pl.userId
                       , depIds: pl.depIds
                       , content: pl.content
                       , deleted: false
-                      }
-
-                , unreadMessageIds =
-                    if pl.userId == model.userId
-                    then model.unreadMessageIds
-                    else model.unreadMessageIds # Set.insert pl.messageId
-                }
+                      })
+            # over (field @"derived" <<< field @"unreadMessageIds")
+                   (if pl.userId == model.userId then identity else Set.insert pl.messageId)
 
         EventPayload_MessageEdit pl ->
           model { messages = model.messages

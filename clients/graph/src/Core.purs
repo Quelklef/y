@@ -25,19 +25,19 @@ type Model =
   , drafts :: Set Draft
   , selectedIds :: Set (Id "Message")
   , focusedId :: Maybe (Id "Message")
-  , layoutName :: String
   , nicknameInputValue :: Maybe String
-  , screenDims :: { width :: Number, height :: Number }
   , openContextMenuMessageId :: Maybe (Id "Message")
 
   -- v Redundant information derived from other model data
   --   Kept in the model for efficieny's sake
   --   Code that changes the model is expected to keep this
   --   information up-to-date (sorry).
-  , userNames :: Map (Id "User") String
-  , messages :: Set Message
-  , unreadMessageIds :: Set (Id "Message")
-  , userIdToFirstEventTime :: Map (Id "User") Instant
+  , derived ::
+    { userNames :: Map (Id "User") String
+    , messages :: Set Message
+    , unreadMessageIds :: Set (Id "Message")
+    , userIdToFirstEventTime :: Map (Id "User") Instant
+    }
   }
 
 type Message =
@@ -57,15 +57,15 @@ mkInitialModel userId roomId =
   , drafts: Set.empty
   , selectedIds: Set.empty
   , focusedId: Nothing
-  , layoutName: Layout.defaultLayoutName
   , nicknameInputValue: Nothing
-  , screenDims: { width: 0.0, height: 0.0 }  -- will be set by a subscription
   , openContextMenuMessageId: Nothing
 
-  , userNames: Map.empty
-  , messages: Set.empty
-  , unreadMessageIds: Set.empty
-  , userIdToFirstEventTime: Map.empty
+  , derived:
+    { userNames: Map.empty
+    , messages: Set.empty
+    , unreadMessageIds: Set.empty
+    , userIdToFirstEventTime: Map.empty
+    }
   }
 
 type Draft =
