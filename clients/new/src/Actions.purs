@@ -25,11 +25,11 @@ import Y.Shared.Id as Id
 import Y.Shared.Event (Event(..), EventPayload(..))
 import Y.Shared.Transmission as Transmission
 
-import Y.Client.Core (Model, Draft)
+import Y.Client.Core (Model)
 import Y.Client.Action (Action(..), afterRender, unAction)
 import Y.Client.WebSocket as Ws
 
-import Data.Lens (over)
+import Data.Lens (over, set)
 import Mation.Lenses (field)
 
 noop :: Action
@@ -70,7 +70,8 @@ fromEvent = \(Event event) -> Action \model -> pure $
     patch'eventSpecific model =
       case event.payload of
         EventPayload_SetName pl ->
-          model # over (field @"userNames") (Map.insert pl.userId pl.name)
+          model # over (field @"derived" <<< field @"userNames")
+                       (Map.insert pl.userId pl.name)
 
         EventPayload_MessageSend pl ->
           model
@@ -87,31 +88,34 @@ fromEvent = \(Event event) -> Action \model -> pure $
                    (if pl.userId == model.userId then identity else Set.insert pl.messageId)
 
         EventPayload_MessageEdit pl ->
-          model { messages = model.messages
-                           # Set.map (\msg -> if msg.id == pl.messageId then msg { content = pl.content } else msg)
-                }
+          model
+            # over (field @"derived" <<< field @"messages" <<< Set.map)
+                   (\msg -> if msg.id == pl.messageId
+                            then msg # set (field @"content") pl.content
+                            else msg)
 
         EventPayload_MessageDelete pl ->
-          model { messages = model.messages
-                           # Set.map (\msg -> if msg.id == pl.messageId
-                                              then msg { content = "", deleted = true }
-                                              else msg)
-                }
+          model
+            # over (field @"derived" <<< field @"messages" <<< Set.map)
+                   (\msg -> if msg.id == pl.messageId
+                            then msg { content = "", deleted = true }
+                            else msg)
 
         EventPayload_MessageSetIsUnread pl ->
-          model { unreadMessageIds =
-                    model.unreadMessageIds
-                    # (if pl.isUnread then Set.insert else Set.delete) pl.messageId
-                }
+          model
+            # over (field @"derived" <<< field @"unreadMessageIds")
+                   ((if pl.isUnread then Set.insert else Set.delete) pl.messageId)
 
   recompute :: Model -> Model
   recompute model = model.events # foldl (flip patch) model0
     where
     model0 = model
-      { userNames = Map.empty
-      , messages = Set.empty
-      , unreadMessageIds = Set.empty
-      , userIdToFirstEventTime = Map.empty
+      { derived =
+        { userNames: Map.empty
+        , messages: Set.empty
+        , unreadMessageIds: Set.empty
+        , userIdToFirstEventTime: Map.empty
+        }
       }
 
 sendEvent :: Event -> Action
@@ -141,28 +145,6 @@ toggleContextMenuFor targetId = Action \model ->
     Just openId -> if openId == targetId then Nothing else Just targetId
   }
 
-createDraft :: Action
-createDraft = Action \model -> do
-  (mid :: Id "Message") <- liftEffect Id.new
-  now <- liftEffect getNow
-
-  let (draft :: Draft) =
-        { id: mid
-        , depIds: model.selectedIds <> (map Set.singleton model.focusedId # fromMaybe Set.empty)
-        , content: ""
-        , timeCreated: now
-        }
-
-  let (newModel :: Model) = model
-        { focusedId = Just mid
-        , selectedIds = (Set.empty :: Set (Id "Message"))
-        , drafts = model.drafts <> Set.singleton draft
-        }
-
-  _ <- afterRender $ focusDraftTextarea draft.id
-
-  pure newModel
-
 -- TODO The `focus*` functions should be reimplemented:
 -- We retrieve the elements via `getElementById()`. This is bad because it splits the
 -- logic into two independent parts: one, assigning the element id, which is in the
@@ -184,31 +166,31 @@ focusCard cardId = do
 foreign import setTimeout0 :: forall a. Effect a -> Effect Unit
 foreign import focusElementById :: String -> Effect Unit
 
-editDraft :: Id "Message" -> String -> Action
-editDraft draftId text = Action \model -> do
-  pure $ model { drafts = model.drafts # Set.map (\draft -> if draft.id == draftId then draft { content = text } else draft) }
-
-sendMessageAndFocusCard :: Draft -> Action
-sendMessageAndFocusCard draft = Action \model -> do
-  now <- liftEffect getNow
-  eventId <- liftEffect Id.new
-  let event = Event
-        { id: eventId
-        , time: now
-        , roomId: model.roomId
-        , payload: EventPayload_MessageSend
-          { messageId: draft.id
-          , timeSent: now
-          , userId: model.userId
-          , depIds: draft.depIds
-          , content: draft.content
+sendMessage ::
+  { replyingTo :: Set (Id "Message")
+  , content :: String
+  } -> Action
+sendMessage { replyingTo, content } =
+  Action \model -> do
+    now <- liftEffect getNow
+    messageId <- liftEffect Id.new
+    eventId <- liftEffect Id.new
+    let event = Event
+          { id: eventId
+          , time: now
+          , roomId: model.roomId
+          , payload: EventPayload_MessageSend
+            { messageId
+            , timeSent: now
+            , userId: model.userId
+            , depIds: replyingTo
+            , content
+            }
           }
-        }
-  model' <- unAction (sendEvent event) model
+    model' <- unAction (sendEvent event) model
 
-  _ <- afterRender $ focusCard draft.id
-
-  pure $ model' { drafts = model.drafts # Set.filter (\d -> d.id /= draft.id) }
+    -- ↓ Remove the draft from the model
+    pure $ model' # over (field @"drafts") (Map.delete replyingTo)
 
 setName :: String -> Action
 setName newName = Action \model -> do
@@ -271,7 +253,7 @@ appendManyMessages = appendRandomCard `power` 12
     messageId <- liftEffect Id.new
 
     depCount <- liftEffect random <#> \x -> floor ((x `Math.pow` 3.0) * 4.0) + 1
-    shuffledMsgs <- liftEffect $ model.messages # Set.toUnfoldable # shuffle
+    shuffledMsgs <- liftEffect $ model.derived.messages # Set.toUnfoldable # shuffle
     let depIds = shuffledMsgs # Array.slice 0 depCount # map _.id # Set.fromFoldable
 
     contentLength <- liftEffect random <#> \x -> floor (x * 50.0) + 5
@@ -308,7 +290,7 @@ appendManyMessages = appendRandomCard `power` 12
 foreign import shuffle :: forall a. Array a -> Effect (Array a)
 
 
--- Downloda a file to the user
+-- Download a file to the user
 download :: Effect { name :: String, content :: String } -> Action
 download get = Action $ \m -> liftEffect do
   { name, content } <- get

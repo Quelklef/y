@@ -12,14 +12,15 @@ import Data.Map as Map
 import Data.Tuple.Nested (type (/\), (/\))
 import Data.Foldable (fold)
 import Effect.Class (liftEffect)
+import Data.Functor.Contravariant (cmap)
 
 import Y.Shared.Id (Id)
 import Y.Shared.Id as Id
 import Y.Shared.Transmission as Transmission
 
 import Y.Client.App (runApp)
-import Y.Client.Core (mkInitialModel, Y_Ws_Client)
-import Y.Client.Action (Action(..), AfterRenderEffect(..), runAction)
+import Y.Client.Core (mkInitialModel, Y_Ws_Client, Model)
+import Y.Client.Action (Action (..), AfterRenderEffect (..), runAction)
 import Y.Client.Actions as Actions
 import Y.Client.View (view)
 import Y.Client.WebSocket as Ws
@@ -27,6 +28,9 @@ import Y.Client.ToSub (websocketClientToSub, MorallySub, morallySubToSub)
 
 import Mation as M
 import Mation.Elems as E
+import Mation.Core.Refs (ReadWriteL)
+import Mation.Core.Refs as Ref
+
 
 foreign import localStorage_ ::
   { has :: String -> Effect Boolean
@@ -111,15 +115,8 @@ main = do
   M.runApp
     { root: M.underBody
     , initial: initialModel
-    , daemon: \_ -> pure unit
-    , render: \_ ->
-        E.div
-        []
-        [ E.p
-          []
-          [ E.text "Hello, Beela"
-          ]
-        ]
+    , daemon
+    , render: view
     }
 
 
@@ -131,3 +128,9 @@ main = do
     wsClient # Ws.transmit (Transmission.ToServer_Pull { roomId })
 
 foreign import setTimeout0 :: forall a. Effect a -> Effect Unit
+foreign import consoleLog :: forall a. a -> Effect Unit
+
+daemon :: ReadWriteL Model -> Effect Unit
+daemon ref = do
+  ref # Ref.onChange consoleLog
+

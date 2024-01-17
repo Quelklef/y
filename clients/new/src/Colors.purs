@@ -8,7 +8,7 @@ import Data.Char (toCharCode)
 import Data.Foldable (sum)
 import Data.Number (remainder)
 
--- @hueSeq seed@ is a sequence of hue values in [0, 1] each of which is
+-- `hueSeq seed` is a sequence of hue values in [0, 1] each of which is
 -- reasonably far apart from all of the previous.
 --
 -- We use this to generate the colors that we associate with users.

@@ -1,11 +1,16 @@
 module Y.Client.Core where
 
+import Prelude
+
 import Data.Set (Set)
 import Data.Set as Set
 import Data.Maybe (Maybe(..))
 import Data.List (List)
 import Data.Map (Map)
 import Data.Map as Map
+import Data.Lens (Lens')
+
+import Mation.Lenses (subrecord)
 
 import Y.Shared.Util.Sorted (Sorted)
 import Y.Shared.Util.Sorted as Sorted
@@ -13,7 +18,6 @@ import Y.Shared.Instant (Instant)
 import Y.Shared.Id (Id)
 import Y.Shared.Event (Event)
 import Y.Shared.Transmission as Transmission
-import Y.Client.Layout as Layout
 import Y.Client.WebSocket as Ws
 
 type Y_Ws_Client = Ws.Client Transmission.ToServer Transmission.ToClient
@@ -22,7 +26,7 @@ type Model =
   { userId :: Id "User"
   , roomId :: Id "Room"
   , events :: Sorted List Event
-  , drafts :: Set Draft
+  , drafts :: Map (Set (Id "Message")) String
   , selectedIds :: Set (Id "Message")
   , focusedId :: Maybe (Id "Message")
   , nicknameInputValue :: Maybe String
@@ -32,13 +36,27 @@ type Model =
   --   Kept in the model for efficieny's sake
   --   Code that changes the model is expected to keep this
   --   information up-to-date (sorry).
-  , derived ::
-    { userNames :: Map (Id "User") String
-    , messages :: Set Message
-    , unreadMessageIds :: Set (Id "Message")
-    , userIdToFirstEventTime :: Map (Id "User") Instant
-    }
+  , derived :: Derived
   }
+
+type Derived =
+  { userNames :: Map (Id "User") String
+  , messages :: Set Message
+  , unreadMessageIds :: Set (Id "Message")
+  , userIdToFirstEventTime :: Map (Id "User") Instant
+  }
+
+-- All the derived stuff is derived from the event list
+--
+-- Here we package the event list together with the
+-- derived stuff
+type EventsAndDerived =
+  { events :: Sorted List Event
+  , derived :: Derived
+  }
+
+lEventsAndDerived :: Lens' Model EventsAndDerived
+lEventsAndDerived = subrecord
 
 type Message =
   { id :: Id "Message"
@@ -54,7 +72,7 @@ mkInitialModel userId roomId =
   { userId: userId
   , roomId: roomId
   , events: Sorted.empty
-  , drafts: Set.empty
+  , drafts: Map.empty
   , selectedIds: Set.empty
   , focusedId: Nothing
   , nicknameInputValue: Nothing
@@ -68,9 +86,3 @@ mkInitialModel userId roomId =
     }
   }
 
-type Draft =
-  { id :: Id "Message"
-  , depIds :: Set (Id "Message")
-  , timeCreated :: Instant
-  , content :: String
-  }

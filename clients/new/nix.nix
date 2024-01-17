@@ -106,10 +106,12 @@ in {
 
     shellHook = ''
 
-      ${shared.mk-shellhook { dir = "clients/graph"; }}
+      ${shared.mk-shellhook { dir = "clients/new"; }}
 
       root=$PWD
 
+      echo 'y.client.watch or y.client.serve'
+ 
       function y.client.serve {(
         cd $root
         purs-nix bundle &&
