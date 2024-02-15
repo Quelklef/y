@@ -31,5 +31,5 @@ runApp args = do
         , update: \model action -> lift ((args.interpret action) model)
         , subscriptions: \model -> args.subscriptions model
         , view: \model -> args.view model
-        } 
+        }
   (runEffectFn1 elmish) unit
