@@ -30,6 +30,7 @@ import Data.Functor.Contravariant (cmap)
 import Data.Lens (over, Iso', iso)
 import Data.Lens.At (at)
 import Data.Function (on)
+import Data.Maybe as Maybe
 
 import Mation (Html', DomEvent)
 import Mation.Core.Refs (ReadWrite, Write, Modify)
@@ -68,30 +69,54 @@ unsafeFromJust m = unsafePartial $ fromJust m
 view :: Model -> Html' (ReadWrite Model)
 view model =
   E.div
-  []
-  [ E.div
-    []
-    [ model.derived.messages
-        # Array.fromFoldable
-        # Array.sortBy (compare `on` _.timeSent)
-        # foldMap viewMessage
+  [ P.addStyles
+    [ S.display "flex"
+    , S.flexDirection "row"
+    , S.padding "12px"
     ]
-  , E.hr []
-  , E.p
-    []
-    [ let
-        replyingTo = model.selectedIds
-        draftContent = model.drafts # Map.lookup replyingTo # fromMaybe ""
-      in
-        cmap
-          (\(ref :: ReadWrite Model) ->
-              { content:
-                  ref
-                  # Ref.focusWithLens (field @"drafts" <<< at replyingTo <<< isoMaybeString)
-                  # Ref.downcast
-              , sendMessage: sendMessage replyingTo ref
-              })
-          (viewSendMessageBox draftContent)
+  ]
+  [ E.div
+    [ P.addStyles
+      [ S.flexGrow "2"
+      ]
+    ]
+    [ cmap
+        (\(ref :: ReadWrite Model) ->
+          { content:
+              ref # Ref.focusWithLens (field @"nicknameInputValue") # Ref.downcast
+          , updateUsername: updateUsername ref
+          })
+        (viewSidebar model.nicknameInputValue)
+    ]
+  , E.div
+    [ P.addStyles
+      [ S.flexGrow "8"
+      ]
+    ]
+    [ E.div
+      []
+      [ model.derived.messages
+          # Array.fromFoldable
+          # Array.sortBy (compare `on` _.timeSent)
+          # foldMap viewMessage
+      ]
+    , E.hr []
+    , E.p
+      []
+      [ let
+          replyingTo = model.selectedIds
+          draftContent = model.drafts # Map.lookup replyingTo # fromMaybe ""
+        in
+          cmap
+            (\(ref :: ReadWrite Model) ->
+                { content:
+                    ref
+                    # Ref.focusWithLens (field @"drafts" <<< at replyingTo <<< isoMaybeString)
+                    # Ref.downcast
+                , sendMessage: sendMessage replyingTo ref
+                })
+            (viewSendMessageBox draftContent)
+      ]
     ]
   ]
 
@@ -108,13 +133,16 @@ view model =
 
   viewMessage :: forall a. Message -> Html' a
   viewMessage message =
-    E.div
-    [ P.addStyles
-      [ S.whiteSpace "pre-wrap"
+    let authorUserName =
+          model.derived.userNames # Map.lookup message.authorId # Maybe.fromMaybe (Id.format message.authorId)
+    in
+      E.div
+      [ P.addStyles
+        [ S.whiteSpace "pre-wrap"
+        ]
       ]
-    ]
-    [ E.text $ "Message: " <> message.content
-    ]
+      [ E.text $ authorUserName <> ": " <> message.content
+      ]
 
   sendMessage :: Set (Id "Message") -> ReadWrite Model -> String -> Effect Unit
   sendMessage replyingTo ref content = do
@@ -130,6 +158,21 @@ view model =
             , depIds: replyingTo
             , timeSent: now
             , content
+            , userId: model.userId
+            }
+          }
+    ref # Ref.modify (over lEventsAndDerived (Derived.appendEvent event))
+
+  updateUsername :: ReadWrite Model -> String -> Effect Unit
+  updateUsername ref newUsername = do
+    now <- liftEffect getNow
+    eventId <- liftEffect Id.new
+    let event = Event
+          { id: eventId
+          , time: now
+          , roomId: model.roomId
+          , payload: EventPayload_SetName
+            { name: newUsername
             , userId: model.userId
             }
           }
@@ -152,6 +195,32 @@ view model =
         # Array.mapWithIndex (\idx userId -> Map.singleton userId idx)
         # foldl Map.union Map.empty
 
+  viewSidebar :: String -> Html' { content :: Write String, updateUsername :: String -> Effect Unit }
+  viewSidebar content =
+    E.div
+    [ P.addStyles
+      [ S.display "flex"
+      , S.padding "12px"
+      ]
+    ]
+    [ E.div
+      []
+      [ E.span [] [ E.text "username:" ]
+      , E.input
+        [ P.onKeyup \(ev :: DomEvent) caps -> do
+              newUsername <- getTargetValue ev
+              caps.content # Ref.write content
+        , P.value content
+        ]
+      , E.button
+        [ P.onClick \_ caps -> do
+              let newUsername = content
+              caps.updateUsername newUsername
+        ]
+        [ E.text "set" ]
+      ]
+    ]
+
 
 
 viewSendMessageBox :: String -> Html'
@@ -159,25 +228,29 @@ viewSendMessageBox :: String -> Html'
   , sendMessage :: String -> Effect Unit
   }
 viewSendMessageBox content =
-  E.textarea
-  [ P.onKeyup \(ev :: DomEvent) caps -> do
-        -- Write textarea content to model
-        content <- getTargetValue ev
-        caps.content # Ref.write content
-        -- Send message if enter pressed
-        isSend ev >>= case _ of
-          true -> do
-            ev # preventDefault
-            caps.sendMessage content
-            caps.content # Ref.write ""  -- Clear input box (not working)
-          false -> pure unit
-  , P.onKeydown \ev _ -> do
-        isSend ev >>= case _ of
-          true -> preventDefault ev
-          false -> pure unit
-  , P.value content
-  ]
+  E.div
   []
+  [ E.span [] [ E.text "Send a message:" ]
+  , E.textarea
+    [ P.onKeyup \(ev :: DomEvent) caps -> do
+          -- Write textarea content to model
+          content <- getTargetValue ev
+          caps.content # Ref.write content
+          -- Send message if enter pressed
+          isSend ev >>= case _ of
+            true -> do
+              ev # preventDefault
+              caps.sendMessage content
+              caps.content # Ref.write ""  -- Clear input box (not working)
+            false -> pure unit
+    , P.onKeydown \ev _ -> do
+          isSend ev >>= case _ of
+            true -> preventDefault ev
+            false -> pure unit
+    , P.value content
+    ]
+    []
+  ]
 
   where
 

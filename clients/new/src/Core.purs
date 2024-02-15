@@ -16,6 +16,7 @@ import Y.Shared.Util.Sorted (Sorted)
 import Y.Shared.Util.Sorted as Sorted
 import Y.Shared.Instant (Instant)
 import Y.Shared.Id (Id)
+import Y.Shared.Id as Id
 import Y.Shared.Event (Event)
 import Y.Shared.Transmission as Transmission
 import Y.Client.WebSocket as Ws
@@ -29,7 +30,7 @@ type Model =
   , drafts :: Map (Set (Id "Message")) String
   , selectedIds :: Set (Id "Message")
   , focusedId :: Maybe (Id "Message")
-  , nicknameInputValue :: Maybe String
+  , nicknameInputValue :: String
   , openContextMenuMessageId :: Maybe (Id "Message")
 
   -- v Redundant information derived from other model data
@@ -75,7 +76,7 @@ mkInitialModel userId roomId =
   , drafts: Map.empty
   , selectedIds: Set.empty
   , focusedId: Nothing
-  , nicknameInputValue: Nothing
+  , nicknameInputValue: Id.format userId
   , openContextMenuMessageId: Nothing
 
   , derived:
@@ -85,4 +86,3 @@ mkInitialModel userId roomId =
     , userIdToFirstEventTime: Map.empty
     }
   }
-

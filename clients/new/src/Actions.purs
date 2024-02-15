@@ -76,7 +76,7 @@ fromEvent = \(Event event) -> Action \model -> pure $
         EventPayload_MessageSend pl ->
           model
             # over (field @"derived" <<< field @"messages")
-                   (Set.insert  
+                   (Set.insert
                       { id: pl.messageId
                       , timeSent: pl.timeSent
                       , authorId: pl.userId
@@ -192,17 +192,17 @@ sendMessage { replyingTo, content } =
     -- ↓ Remove the draft from the model
     pure $ model' # over (field @"drafts") (Map.delete replyingTo)
 
-setName :: String -> Action
-setName newName = Action \model -> do
-  let roomId = model.roomId
-  let userId = model.userId
-
-  now <- liftEffect getNow
-  eventId <- liftEffect Id.new
-  let event = Event { id: eventId, time: now, roomId, payload: EventPayload_SetName { userId, name: newName } }
-  model' <- unAction (sendEvent event) model
-
-  pure $ model' { nicknameInputValue = Nothing }
+--setName :: String -> Action
+--setName newName = Action \model -> do
+--  let roomId = model.roomId
+--  let userId = model.userId
+--
+--  now <- liftEffect getNow
+--  eventId <- liftEffect Id.new
+--  let event = Event { id: eventId, time: now, roomId, payload: EventPayload_SetName { userId, name: newName } }
+--  model' <- unAction (sendEvent event) model
+--
+--  pure $ model' { nicknameInputValue = Nothing }
 
 setIsUnread :: Id "Message" -> Boolean -> Action
 setIsUnread messageId isUnread = Action \model -> do
